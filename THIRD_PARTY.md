@@ -11,8 +11,8 @@ da fonti secondarie, da confermare sulla pagina ufficiale prima dell'uso indicat
 
 | Modello | Versione usata | Licenza | Uso consentito qui | Stato | Fonte |
 |---|---|---|---|---|---|
-| H-optimus-0 (Bioptimus) | non ancora scaricato | Apache 2.0, accesso controllato | Backbone dell'MVP, anche binario prodotto | da verificare | https://huggingface.co/bioptimus/H-optimus-0 |
-| Phikon (Owkin) | commit `057cc0295895` | Owkin non-commercial | Solo sviluppo locale e test della pipeline; mai nel binario prodotto | da verificare | https://huggingface.co/owkin/phikon |
+| H-optimus-0 (Bioptimus) | commit `b145cc1e6c6b` | Apache 2.0, accesso controllato | Backbone dell'MVP, anche binario prodotto | verificata il 2026-10-13 sui metadati della scheda Hugging Face (`license: apache-2.0`) | https://huggingface.co/bioptimus/H-optimus-0 |
+| Phikon (Owkin) | commit `057cc0295895` | Owkin non-commercial (su Hugging Face: `license: other`) | Solo sviluppo locale e test della pipeline; mai nel binario prodotto | da verificare: leggere il testo della licenza | https://huggingface.co/owkin/phikon |
 
 ## Dataset
 

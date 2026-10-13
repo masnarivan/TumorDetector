@@ -88,4 +88,4 @@ Il notebook `notebooks/extract_colab.ipynb` lo esegue con gli embedding su Googl
 ## Licenze e dipendenze
 
 Modelli, dataset e strumenti sono registrati in [THIRD_PARTY.md](THIRD_PARTY.md), con lo stato di
-verifica di ogni licenza. La licenza di questo repository non è ancora stata scelta.
+verifica di ogni licenza. Il codice di questo repository è rilasciato con licenza [Apache 2.0](LICENSE).

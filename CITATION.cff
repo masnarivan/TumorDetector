@@ -6,6 +6,8 @@ authors:
   - family-names: Masnari
     given-names: Ivan
 version: 0.1.0
+license: Apache-2.0
+repository-code: "https://github.com/masnarivan/TumorDetector"
 date-released: 2026-10-13
 references:
   - type: article

@@ -3,6 +3,8 @@ name = "tumordetector"
 version = "0.1.0"
 description = "Decision-support pipeline for H&E histopathology: QC, foundation-model embeddings, vector search. Research use only."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "torch",
