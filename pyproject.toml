@@ -1,0 +1,56 @@
+[project]
+name = "tumordetector"
+version = "0.1.0"
+description = "Decision-support pipeline for H&E histopathology: QC, foundation-model embeddings, vector search. Research use only."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "torch",
+    "torchvision",
+    "transformers",
+    "timm",
+    "huggingface-hub",
+    "openslide-python",
+    "openslide-bin",
+    "shapely",
+    "scikit-image",
+    "scipy",
+    "numpy",
+    "pandas",
+    "pyarrow",
+    "pydantic>=2",
+    "hydra-core",
+    "mlflow",
+    "psycopg[binary]",
+    "pgvector",
+    "certifi",
+]
+
+[project.scripts]
+td = "tumordetector.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "ruff",
+    "dvc",
+    "tifffile",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/tumordetector"]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+extend-exclude = ["notebooks"]   # Colab cells mix shell magics and Python
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

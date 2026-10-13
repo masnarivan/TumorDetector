@@ -1,0 +1,9 @@
+# Apache 2.0, gated on Hugging Face: accept the terms on the model page and run `hf auth login`.
+name: h_optimus_0
+repo_id: bioptimus/H-optimus-0
+revision: null
+offline: false
+input_px: 224
+mpp: 0.5
+dim: 1536
+half: true           # float16 autocast on CUDA (Colab / Kaggle)

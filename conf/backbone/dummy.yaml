@@ -1,0 +1,6 @@
+# Fixed random projection, no weights to download: tests and CI only.
+name: dummy
+input_px: 224
+mpp: 0.5
+dim: 32
+seed: 0

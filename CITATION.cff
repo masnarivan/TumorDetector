@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "Se usi questo software, citalo come indicato qui sotto."
+title: "TumorDetector: sistema di supporto diagnostico in istopatologia"
+type: software
+authors:
+  - family-names: Masnari
+    given-names: Ivan
+version: 0.1.0
+date-released: 2026-10-13
+references:
+  - type: article
+    title: "Diagnostic Assessment of Deep Learning Algorithms for Detection of Lymph Node Metastases in Women With Breast Cancer"
+    authors:
+      - family-names: Ehteshami Bejnordi
+        given-names: Babak
+    journal: JAMA
+    year: 2017
+    notes: "Dataset CAMELYON16"

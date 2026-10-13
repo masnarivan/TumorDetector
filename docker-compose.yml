@@ -1,0 +1,22 @@
+# Local development database: metadata and embeddings in one PostgreSQL + pgvector.
+# The defaults below are throwaway development values; set POSTGRES_PASSWORD (and TD_PG_DSN
+# for the pipeline) in .env before running this anywhere but your own machine.
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: td
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-td_dev}
+      POSTGRES_DB: tumordetector
+    ports:
+      - "127.0.0.1:5433:5432"     # localhost only; 5433 avoids clashing with a local Postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U td -d tumordetector"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  pgdata:

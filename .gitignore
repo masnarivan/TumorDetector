@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+.env
+mlflow.db
+mlruns/
+mlartifacts/
+# Pipeline outputs: tracked by DVC, never by git. Manifests are small and stay in git.
+/data/*
+!/data/manifests/

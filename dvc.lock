@@ -1,0 +1,108 @@
+schema: '2.0'
+stages:
+  tile_qc:
+    cmd: td task=tile
+    deps:
+    - path: data/manifests/camelyon16.csv
+      hash: md5
+      md5: 6008cc982ba65250a15dc8747bca8d52
+      size: 85273
+    - path: src/tumordetector/cli.py
+      hash: md5
+      md5: ee3031602b76d2eac466a27c65bf3c0e
+      size: 15197
+    - path: src/tumordetector/data/camelyon_annotations.py
+      hash: md5
+      md5: 8972023c8bd9d29b4949424dfe2c3151
+      size: 2573
+    - path: src/tumordetector/qc/tissue.py
+      hash: md5
+      md5: dda6f5c020b388072fe6443e3386061f
+      size: 3485
+    - path: src/tumordetector/wsi/tiling.py
+      hash: md5
+      md5: 2e97cf314fec09dd354e1c1badf42024
+      size: 3177
+    params:
+      conf/config.yaml:
+        qc:
+          min_tiles: 50
+          min_tissue_mm2: 1.0
+        tiling:
+          tile_px: 224
+          target_mpp: 0.5
+          min_tissue: 0.5
+          mask_downsample: 64
+          mask_margin: 0.03
+      conf/data/camelyon16.yaml:
+        slides:
+        - tumor_031
+        - normal_108
+    outs:
+    - path: data/qc
+      hash: md5
+      md5: 86652b300f424ef52df6efe05368f589.dir
+      size: 4565178
+      nfiles: 7
+    - path: data/tiles
+      hash: md5
+      md5: ddbc795ef4d7cb475b474e6e645044b2.dir
+      size: 26480
+      nfiles: 2
+  embed:
+    cmd: td task=embed backbone=phikon
+    deps:
+    - path: conf/backbone/phikon.yaml
+      hash: md5
+      md5: c0a0d3293958e45397e5ee1576492a0d
+      size: 333
+    - path: data/qc
+      hash: md5
+      md5: 86652b300f424ef52df6efe05368f589.dir
+      size: 4565178
+      nfiles: 7
+    - path: data/tiles
+      hash: md5
+      md5: ddbc795ef4d7cb475b474e6e645044b2.dir
+      size: 26480
+      nfiles: 2
+    - path: src/tumordetector/backbones
+      hash: md5
+      md5: e5d7c184bce1d960909ea21985ad50b2.dir
+      size: 4720
+      nfiles: 3
+    - path: src/tumordetector/cli.py
+      hash: md5
+      md5: ee3031602b76d2eac466a27c65bf3c0e
+      size: 15197
+    - path: src/tumordetector/embed
+      hash: md5
+      md5: 6198ac47e351bca82449c6b819402ef5.dir
+      size: 6969
+      nfiles: 3
+    params:
+      conf/config.yaml:
+        embed.dtype: float16
+    outs:
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: b01ba61840f39450101832504cd04e42.dir
+      size: 8644744
+      nfiles: 8
+  index:
+    cmd: td task=index backbone=phikon
+    deps:
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: b01ba61840f39450101832504cd04e42.dir
+      size: 8644744
+      nfiles: 8
+    - path: src/tumordetector/vectordb/pg.py
+      hash: md5
+      md5: bd71588dcd359ab6dfab3a0b7d2db675
+      size: 4357
+    outs:
+    - path: data/index/phikon.json
+      hash: md5
+      md5: a003a4c8b63973ba4398ddefd2660f51
+      size: 254

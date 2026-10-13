@@ -1,0 +1,8 @@
+# Owkin non-commercial licence: local development only, never on the product track.
+name: phikon
+repo_id: owkin/phikon
+revision: null       # null = whatever is in the local HF cache; the resolved commit is recorded
+offline: true        # never contact the Hub (a TLS handshake once hung for an hour)
+input_px: 224
+mpp: 0.5
+dim: 768

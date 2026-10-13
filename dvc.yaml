@@ -1,0 +1,48 @@
+# Reproducible pipeline: `dvc repro` reruns only the stages whose code, config or inputs changed.
+# The manifest is not a stage: it is rebuilt on purpose (`td task=manifest`) and versioned in git.
+vars:
+  - backbone: phikon          # switch to h_optimus_0 once the weights are available
+
+stages:
+  tile_qc:
+    cmd: td task=tile
+    deps:
+      - data/manifests/camelyon16.csv
+      - src/tumordetector/cli.py
+      - src/tumordetector/wsi/tiling.py
+      - src/tumordetector/qc/tissue.py
+      - src/tumordetector/data/camelyon_annotations.py
+    params:
+      - conf/config.yaml:
+          - tiling
+          - qc
+      - conf/data/camelyon16.yaml:
+          - slides
+    outs:
+      - data/tiles
+      - data/qc
+
+  embed:
+    cmd: td task=embed backbone=${backbone}
+    deps:
+      - data/tiles
+      - data/qc
+      - conf/backbone/${backbone}.yaml
+      - src/tumordetector/cli.py
+      - src/tumordetector/embed
+      - src/tumordetector/backbones
+    params:
+      - conf/config.yaml:
+          - embed.dtype
+    outs:
+      - data/embeddings/${backbone}:
+          persist: true       # resumable: a slide is re-embedded only if its file or tile grid changed
+
+  index:
+    cmd: td task=index backbone=${backbone}
+    deps:
+      - data/embeddings/${backbone}
+      - src/tumordetector/vectordb/pg.py
+    outs:
+      - data/index/${backbone}.json:
+          cache: false
