@@ -3,7 +3,7 @@ defaults:
   - data: camelyon16
   - _self_
 
-task: ???            # manifest | tile | embed | index
+task: ???            # manifest | tile | embed | index | stream | splits | train
 seed: 0
 
 paths:
@@ -32,3 +32,23 @@ vectordb:
 mlflow:
   tracking_uri: sqlite:///mlflow.db
   experiment: embedding-extraction
+
+mil:                 # ABMIL baseline on frozen embeddings
+  hidden: 256
+  dropout: 0.25
+  lr: 2.0e-4
+  weight_decay: 1.0e-4
+  epochs: 30
+  max_tiles: 4096    # tiles sampled per slide at each training step
+  threshold: 0.5
+  folds: 5
+  device: cpu        # small model: the CPU is fast enough and deterministic
+  experiment: baseline-abmil
+  overwrite_splits: false
+
+gate:                # promotion battery: initial proposals, to be agreed with the pathologists
+  min_slides: 100    # below this a run only checks that the code works
+  min_cv_auroc: 0.90
+  min_loco_worst_auroc: 0.85
+  min_test_auroc: 0.90
+  max_ece: 0.10

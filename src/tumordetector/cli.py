@@ -5,6 +5,8 @@
   td task=embed backbone=phikon        embeddings per slide (resumable)
   td task=index backbone=phikon        embeddings -> pgvector
   td task=stream backbone=h_optimus_0  download -> tile -> embed -> delete, slide by slide (Colab)
+  td task=splits                       data/manifests/<dataset>_splits.csv (cross-validation folds)
+  td task=train backbone=phikon        ABMIL baseline, validation report, model registry
 
 Any config value can be overridden on the command line, e.g. `data.slides=[tumor_031]`.
 """
@@ -308,8 +310,96 @@ def task_index(cfg: DictConfig):
                {**ident, "table": table, "slides": counts, "rows_in_table": pg.count(conn, table)})
 
 
+def splits_path(cfg: DictConfig) -> Path:
+    manifest = Path(cfg.data.manifest)
+    return manifest.with_name(manifest.stem + "_splits.csv")
+
+
+def task_splits(cfg: DictConfig):
+    """Written once and versioned in git: a fold never changes because code or data did."""
+    from tumordetector.mil.evaluate import make_cv_folds
+
+    out = splits_path(cfg)
+    if out.exists() and not cfg.mil.overwrite_splits:
+        raise SystemExit(f"{out} exists; splits are never regenerated implicitly (mil.overwrite_splits=true)")
+    folds = make_cv_folds(load_manifest(cfg), cfg.mil.folds, cfg.seed)
+    folds.to_csv(out, index=False)
+    print(folds.cv_fold.value_counts().sort_index().to_string(), f"\n-> {out}")
+
+
+def task_train(cfg: DictConfig):
+    import mlflow
+    import torch
+    from mlflow.models import ModelSignature
+    from mlflow.types import Schema, TensorSpec
+
+    from tumordetector.embed import store
+    from tumordetector.mil import report
+    from tumordetector.mil.evaluate import gate, run_protocol
+
+    out = Path(cfg.paths.out)
+    root = out / "embeddings" / cfg.backbone.name
+    ident = read_json(root / "collection.json")
+    table = load_manifest(cfg).merge(pd.read_csv(splits_path(cfg)), on="slide_id", validate="one_to_one")
+    table = table[table.slide_id.isin(store.list_slides(root))].reset_index(drop=True)
+    if table.empty:
+        raise SystemExit(f"no embeddings in {root}")
+    bags = {s: np.load(root / f"{s}.npy") for s in table.slide_id}
+
+    result = run_protocol(table, bags, lambda s: pd.read_parquet(root / f"{s}.parquet").label.to_numpy(),
+                          cfg.mil, cfg.seed)
+    verdict = gate(result["metrics"], result["n_slides"], cfg.gate)
+    model_name = f"abmil-{cfg.data.name}-{cfg.backbone.name}"
+    hyper = {k: cfg.mil[k] for k in ("hidden", "dropout", "lr", "weight_decay", "epochs", "max_tiles", "threshold")}
+    context = {"Modello": model_name, "Collezione embedding": ident["collection"],
+               "Versione backbone": ident["version"], "Split": f"{splits_path(cfg)} (seed {cfg.seed})",
+               "Iperparametri": hyper, "Versione codice": code_version()}
+
+    rep = out / "reports" / cfg.backbone.name / "abmil"
+    rep.mkdir(parents=True, exist_ok=True)
+    (rep / "report.md").write_text(report.render(result, verdict, context))
+    write_json(rep / "metrics.json", {"gate": verdict, "n_slides": result["n_slides"], **result["metrics"]})
+    result["predictions"].to_csv(rep / "predictions.csv", index=False)
+    result["attention"].to_csv(rep / "attention.csv", index=False)
+
+    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
+    mlflow.set_experiment(cfg.mil.experiment)
+    with mlflow.start_run(run_name=model_name):
+        mlflow.log_params({"backbone": cfg.backbone.name, "backbone_version": ident["version"],
+                           "collection": ident["collection"], "dataset": cfg.data.name, "seed": cfg.seed,
+                           "n_slides": result["n_slides"], "code_version": context["Versione codice"],
+                           **{f"mil.{k}": v for k, v in cfg.mil.items()}})
+        m = result["metrics"]
+        flat = {"cv_auroc": m["cv"].get("auroc"), "cv_ece": m["cv"].get("ece"),
+                "loco_worst_auroc": m["loco_worst_auroc"], "test_auroc": m["test"].get("auroc"),
+                "attention_auroc_mean": m["attention_auroc_mean"]}
+        mlflow.log_metrics({k: v for k, v in flat.items() if v is not None})
+        mlflow.set_tag("validation_status", verdict["status"])
+        mlflow.log_artifacts(str(rep), artifact_path="validation")
+        if result["model"] is not None:
+            torch.save(result["model"].state_dict(), rep / "model.pt")
+            # A few real tiles as the input example: the saved graph keeps the number of tiles free.
+            example = next(iter(bags.values()))[:8].astype(np.float32)
+            # The signature is given explicitly: MLflow cannot infer one from a model that returns
+            # two tensors (slide logit, attention weights).
+            signature = ModelSignature(inputs=Schema([TensorSpec(np.dtype("float32"), (-1, example.shape[1]))]))
+            info = mlflow.pytorch.log_model(result["model"], name="model", input_example=example,
+                                            signature=signature, registered_model_name=model_name)
+            # Registry states are aliases: every trained model is a 'candidate'; 'validated' is
+            # set only by a passed battery, and 'production' is never set from here.
+            client = mlflow.MlflowClient()
+            version = info.registered_model_version
+            client.set_registered_model_alias(model_name, "candidate", version)
+            if verdict["status"] == "passed":
+                client.set_registered_model_alias(model_name, "validated", version)
+            for k, v in {"validation_status": verdict["status"], "collection": ident["collection"]}.items():
+                client.set_model_version_tag(model_name, version, k, v)
+    print(f"{model_name}: {result['n_slides']} slides, battery {verdict['status']}", *verdict["reasons"], sep="\n  ")
+    print(f"report -> {rep / 'report.md'}")
+
+
 TASKS = {"manifest": task_manifest, "tile": task_tile, "embed": task_embed, "index": task_index,
-         "stream": task_stream}
+         "stream": task_stream, "splits": task_splits, "train": task_train}
 
 
 def main(argv: list[str] | None = None):

@@ -2,6 +2,6 @@ name: camelyon16
 manifest: data/manifests/camelyon16.csv
 # Slides already on this Mac (prototype 02); nothing is copied into the repo.
 raw_dir: ${oc.env:TD_RAW_DIR,/Users/ivanmasnari/Desktop/genomics/02-mil-camelyon16/data/raw}
-slides: [tumor_031, normal_108]   # null = every manifest slide found in raw_dir
+slides: null                     # null = every manifest slide found in raw_dir; or a list of ids
 verify_md5: true
 keep_slides: false               # task=stream only: keep each .tif after embedding it

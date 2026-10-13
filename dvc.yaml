@@ -1,5 +1,6 @@
 # Reproducible pipeline: `dvc repro` reruns only the stages whose code, config or inputs changed.
-# The manifest is not a stage: it is rebuilt on purpose (`td task=manifest`) and versioned in git.
+# Manifest and splits are not stages: they are rebuilt on purpose (`td task=manifest`, `td task=splits`)
+# and versioned in git.
 vars:
   - backbone: phikon          # switch to h_optimus_0 once the weights are available
 
@@ -45,4 +46,25 @@ stages:
       - src/tumordetector/vectordb/pg.py
     outs:
       - data/index/${backbone}.json:
+          cache: false
+
+  baseline:
+    cmd: td task=train backbone=${backbone}
+    deps:
+      - data/embeddings/${backbone}
+      - data/manifests/camelyon16_splits.csv
+      - src/tumordetector/mil
+    params:
+      - conf/config.yaml:
+          - seed
+          - mil
+          - gate
+    outs:
+      - data/reports/${backbone}/abmil/model.pt
+      - data/reports/${backbone}/abmil/predictions.csv
+      - data/reports/${backbone}/abmil/attention.csv
+      - data/reports/${backbone}/abmil/report.md:
+          cache: false        # small and worth reading in a diff: versioned in git
+    metrics:
+      - data/reports/${backbone}/abmil/metrics.json:
           cache: false

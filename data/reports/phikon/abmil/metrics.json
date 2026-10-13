@@ -1,0 +1,67 @@
+{
+ "attention_auroc_mean": 0.7171117791166695,
+ "cv": {
+  "auroc": 0.48,
+  "balanced_accuracy": 0.5,
+  "brier": 0.4692488013598052,
+  "ece": 0.5228224965743721,
+  "n": 10,
+  "n_pos": 5,
+  "sensitivity": 0.4,
+  "specificity": 0.6
+ },
+ "cv_by_center": {
+  "radboud": {
+   "auroc": 0.0,
+   "balanced_accuracy": 0.16666666666666666,
+   "brier": 0.7486701297083951,
+   "ece": 0.8022839471697808,
+   "n": 5,
+   "n_pos": 3,
+   "sensitivity": 0.3333333333333333,
+   "specificity": 0.0
+  },
+  "utrecht": {
+   "auroc": 0.8333333333333334,
+   "balanced_accuracy": 0.75,
+   "brier": 0.1898274730112154,
+   "ece": 0.24336104597896335,
+   "n": 5,
+   "n_pos": 2,
+   "sensitivity": 0.5,
+   "specificity": 1.0
+  }
+ },
+ "gate": {
+  "reasons": [
+   "10 vetrini, ne servono almeno 100: questa esecuzione verifica solo che il codice funzioni"
+  ],
+  "status": "insufficient_data"
+ },
+ "loco": {
+  "held-out radboud": {
+   "auroc": 0.3333333333333333,
+   "balanced_accuracy": 0.5833333333333333,
+   "brier": 0.33272079167477514,
+   "ece": 0.5035623103380203,
+   "n": 5,
+   "n_pos": 3,
+   "sensitivity": 0.6666666666666666,
+   "specificity": 0.5
+  },
+  "held-out utrecht": {
+   "auroc": 0.33333333333333337,
+   "balanced_accuracy": 0.5,
+   "brier": 0.35122600583747865,
+   "ece": 0.43197160810232155,
+   "n": 5,
+   "n_pos": 2,
+   "sensitivity": 0.0,
+   "specificity": 1.0
+  }
+ },
+ "loco_worst_auroc": 0.3333333333333333,
+ "n_slides": 10,
+ "test": {},
+ "test_by_center": {}
+}

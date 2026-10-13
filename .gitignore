@@ -11,3 +11,4 @@ mlartifacts/
 # Pipeline outputs: tracked by DVC, never by git. Manifests are small and stay in git.
 /data/*
 !/data/manifests/
+!/data/reports/
