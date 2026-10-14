@@ -18,7 +18,7 @@ jobs:
         run: uv run ruff check
       - name: Licence gate (runtime dependencies)
         run: uv run scripts/check_licenses.py
-      - name: Tests (synthetic slide, dummy backbone: no weights, no data)
+      - name: "Tests (synthetic slide, dummy backbone: no weights, no data)"
         run: uv run pytest -q
       - name: Pipeline definition is valid
         run: uv run dvc stage list
