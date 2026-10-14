@@ -14,6 +14,8 @@ from packaging.requirements import Requirement
 REVIEWED = {
     "huey": "MIT",        # https://github.com/coleifer/huey/blob/master/LICENSE
     "skops": "MIT",       # https://github.com/skops-dev/skops/blob/main/LICENSE
+    # Linux-only metapackage pulled in by torch; same licence as the nvidia-* wheels it selects.
+    "cuda-toolkit": "NVIDIA CUDA Toolkit EULA",  # https://docs.nvidia.com/cuda/eula/
 }
 # GPL/AGPL is a blocker unless it is LGPL, one side of an "OR", or carries a linking exception.
 BLOCKED = re.compile(r"(?<![L])A?GPL", re.I)
