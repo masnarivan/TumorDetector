@@ -1,7 +1,8 @@
 # Report di validazione — abmil-camelyon16-phikon
 
-**Esito della batteria: SUPERATA** (media su 3 semi)
+**Esito della batteria: NON SUPERATA** (media su 3 semi)
 
+- ECE peggiore in leave-one-center-out 0.146, richiesto <= 0.1
 
 Solo uso di ricerca. Le soglie della batteria sono proposte iniziali, da fissare con i patologi.
 
@@ -15,7 +16,7 @@ Solo uso di ricerca. Le soglie della batteria sono proposte iniziali, da fissare
 | Split | `data/manifests/camelyon16_splits.csv (seed 0)` |
 | Iperparametri | `{'hidden': 256, 'dropout': 0.25, 'lr': 0.0002, 'weight_decay': 0.0001, 'epochs': 30, 'max_tiles': 4096, 'threshold': 0.5, 'normalize': 'none', 'threads': 1}` |
 | Semi | `[0, 1, 2] (modello salvato: seme 0)` |
-| Versione codice | `c07c13a14e55610c656635d3b15e6764ce40ac75` |
+| Versione codice | `6c3a7a97331c1be4e55a22b2f4d235281ac9718b` |
 | Vetrini con embedding | 399 (270 sviluppo, 129 test bloccato) |
 
 ## Risultati
@@ -29,7 +30,7 @@ Ogni valore è la media su 3 semi (0, 1, 2): stesso protocollo, stessi split, ca
 | Leave-one-center-out, held-out utrecht | 99 | 40 | 0.997 | 0.992 | 0.864 | 0.928 | 0.065 | 0.146 |
 | Split di test bloccato | 129 | 49 | 0.996 | 0.946 | 0.958 | 0.952 | 0.032 | 0.041 |
 
-AUROC peggiore tra i centri esclusi: **0.973**.
+Centro escluso peggiore (per seme, poi media): AUROC **0.973**, ECE **0.146**, specificità **0.811**.
 
 ### Per centro
 
@@ -51,6 +52,8 @@ AUROC dell'attenzione nel distinguere tile tumorali da normali, media sui vetrin
 | cv/auroc | 0.989 | 0.003 | 0.987 | 0.993 | 0.987 | 0.989 | 0.993 |
 | cv/ece | 0.040 | 0.009 | 0.031 | 0.049 | 0.049 | 0.040 | 0.031 |
 | loco_worst_auroc | 0.973 | 0.024 | 0.945 | 0.988 | 0.945 | 0.986 | 0.988 |
+| loco_worst_ece | 0.146 | 0.038 | 0.123 | 0.190 | 0.126 | 0.190 | 0.123 |
+| loco_worst_specificity | 0.811 | 0.044 | 0.763 | 0.850 | 0.820 | 0.763 | 0.850 |
 | test/auroc | 0.996 | 0.001 | 0.995 | 0.997 | 0.995 | 0.997 | 0.995 |
 | test/ece | 0.041 | 0.014 | 0.032 | 0.057 | 0.034 | 0.032 | 0.057 |
 | attention_auroc_mean | 0.989 | 0.004 | 0.985 | 0.992 | 0.992 | 0.990 | 0.985 |
@@ -91,7 +94,7 @@ AUROC dell'attenzione nel distinguere tile tumorali da normali, media sui vetrin
 | Leave-one-center-out, risultato peggiore | sì |
 | Test esterno bloccato | sì, quando gli embedding dello split di test sono disponibili |
 | Robustezza al centro (Robustness Index, probe lineare sul centro) | no |
-| Calibrazione (ECE) | sì, aggregata; per centro nella tabella per centro |
+| Calibrazione (ECE) | sì: in CV e sul centro escluso peggiore; per centro nelle tabelle |
 | Copertura conformal | no: il modello non produce ancora insiemi di predizione |
 | OOD | no |
 | Metriche alla prevalenza reale, tasso di rinvio | no |
