@@ -27,6 +27,8 @@ dependencies = [
     "pgvector",
     "certifi",
     "scikit-learn>=1.9.1",
+    "qdrant-client>=1.19.1",
+    "truststore>=0.10.5",
 ]
 
 [project.scripts]

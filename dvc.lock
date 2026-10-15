@@ -26,20 +26,29 @@ stages:
       size: 1290
     - path: src/tumordetector/tasks/index.py
       hash: md5
-      md5: 05c1928837ee1e486b9c0632b32e135d
-      size: 2483
-    - path: src/tumordetector/vectordb/pg.py
+      md5: b8fda7b28ba2a14fd35503e3b6cc91ad
+      size: 4653
+    - path: src/tumordetector/vectordb/qdrant.py
       hash: md5
-      md5: 1e7406f8c51dbf61a4e36302c97e7a1e
-      size: 7748
+      md5: 07b917ba0865c0a6d917ff8b66fe2689
+      size: 5611
+    - path: src/tumordetector/vectordb/reduce.py
+      hash: md5
+      md5: 857ca7b2ee1285dc3a7c618b7833a5c8
+      size: 3335
     params:
+      conf/config.yaml:
+        index:
+          region_tiles: 8
+          min_region_tiles: 16
+          prototypes: 256
       conf/data/camelyon16.yaml:
-        slides: null
+        slides:
     outs:
     - path: data/index/phikon.json
       hash: md5
-      md5: 00a1056acb2e229cb3194f55f9ba6f4a
-      size: 33361
+      md5: af6f389989461da8d976935dc3f39d46
+      size: 85154
   baseline:
     cmd: td task=train backbone=phikon
     deps:
@@ -146,6 +155,10 @@ stages:
       hash: md5
       md5: f81797c30bbf27491f39d5ea53b09eae
       size: 5175
+    - path: src/tumordetector/data/camelyon17.py
+      hash: md5
+      md5: 0be01a3033d41e00aad49d4d8263d1bd
+      size: 4598
     - path: src/tumordetector/data/camelyon_annotations.py
       hash: md5
       md5: 8972023c8bd9d29b4949424dfe2c3151
@@ -173,8 +186,8 @@ stages:
       size: 6185
     - path: src/tumordetector/tasks/stream.py
       hash: md5
-      md5: 4dce4d36b1e05459f53d0e7fb320158f
-      size: 3505
+      md5: e384404b40adefc7f60f5a4f5fd97b1f
+      size: 3591
     - path: src/tumordetector/tasks/tile.py
       hash: md5
       md5: cc4cdaf9826a379bc935a17bced13cf8
@@ -197,7 +210,7 @@ stages:
           mask_margin: 0.03
       conf/data/camelyon16.yaml:
         name: camelyon16
-        slides: null
+        slides:
     outs:
     - path: data/embeddings/phikon
       hash: md5

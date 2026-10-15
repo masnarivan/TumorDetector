@@ -29,7 +29,7 @@ UNTRACKED = {
     "embed.batch_size": "speed, as embed.device",
     "embed.threads": "speed, as embed.device",
     "mlflow": "run tracking",
-    "vectordb": "the database the index is loaded into, recorded in data/index/<backbone>.json",
+    "vectordb": "the database the index is loaded into (url recorded in data/index/<backbone>.json)",
     "mil.workers": "seeds trained in parallel: each seed runs the same as alone (mil.threads is fixed)",
     "mil.experiment": "MLflow experiment name",
     "mil.register": "model registry, outside the stage's outputs",

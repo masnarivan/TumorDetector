@@ -17,20 +17,22 @@ from tumordetector.tasks.tile import tile_slide
 def download(cfg: DictConfig, row, raw: Path) -> tuple[Path, bool]:
     """Download (or reuse) the slide and its annotation; raise if the md5 does not match.
     -> (path, fresh): fresh is False for a file that was already there, which is never deleted."""
-    from tumordetector.data import camelyon16
+    from tumordetector.data import camelyon16, camelyon17
     from tumordetector.io import curl
+
+    source = {"camelyon16": camelyon16, "camelyon17": camelyon17}[cfg.data.name]
 
     tif = raw / f"{row.slide_id}.tif"
     fresh = not tif.exists()
     if fresh:
         part = tif.with_suffix(".tif.part")
-        curl(camelyon16.slide_url(row.slide_id), part)
+        curl(source.slide_url(row.slide_id), part)
         if md5sum(part) != row.file_md5:
             part.unlink()  # corrupted: start from scratch next time
             raise OSError(f"md5 mismatch for {row.slide_id}")
         part.rename(tif)
     if row.has_xml and not (xml := tif.with_suffix(".xml")).exists():
-        curl(camelyon16.annotation_url(row.slide_id), xml)
+        curl(source.annotation_url(row.slide_id), xml)
     return tif, fresh
 
 

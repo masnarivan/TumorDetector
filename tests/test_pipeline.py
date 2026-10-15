@@ -199,35 +199,30 @@ def test_cli_stream_does_not_fetch_a_referred_slide_again(tmp_path, slide_path, 
 
 
 def test_vectordb_upsert_is_idempotent_and_search_finds_itself(tiled):
-    psycopg = pytest.importorskip("psycopg")
-    from tumordetector.vectordb import pg
+    from qdrant_client import QdrantClient
 
-    try:
-        conn = pg.connect(OmegaConf.load(cli.CONF_DIR / "config.yaml").vectordb.dsn)
-    except psycopg.OperationalError:
-        pytest.skip("no database: start it with `docker compose up -d`")
+    from tumordetector.vectordb import qdrant
+
+    client = QdrantClient(":memory:")             # the same API as the server, in process
     _, _, tiles = tiled
     feats = np.random.default_rng(0).normal(size=(len(tiles), 32)).astype(np.float32)
     ident = {"collection": "pytest__tmp", "backbone": "pytest", "version": "tmp", "dim": 32}
-    table = pg.ensure_collection(conn, ident, rebuild=True)
-    try:
-        for _ in range(2):
-            assert pg.upsert_slide(conn, table, "s1", feats, tiles.assign(label="normal"), "a", "h1") == len(tiles)
-        pg.upsert_slide(conn, table, "s2", feats + 0.01, tiles, None)
-        assert pg.count(conn, table) == 2 * len(tiles)
-        hit = pg.search(conn, table, feats[7], k=1)
-        assert (hit.slide_id[0], hit.tile_idx[0], hit.label[0]) == ("s1", 7, "normal")
-        assert hit.distance[0] == pytest.approx(0, abs=1e-6)
-        assert set(pg.search(conn, table, feats[7], k=3, exclude_slide="s1").slide_id) == {"s2"}
-        assert pg.indexed(conn, table) == {"s1": "h1", "s2": None}
-        assert pg.build_index(conn, table, "64MB", 0) and not pg.build_index(conn, table, "64MB", 0)
-        assert pg.search(conn, table, feats[7], k=1).tile_idx[0] == 7     # through the index
-        # every one of the index's candidates is from s1: the exclusion must not empty the result
-        assert len(pg.search(conn, table, feats[7], k=3, exclude_slide="s1")) == 3
-        with pytest.raises(RuntimeError, match="rebuild"):                # same collection, other schema
-            pg.ensure_collection(conn, {**ident, "dim": 16})
-        pg.ensure_collection(conn, ident, rebuild=True)
-        assert pg.indexed(conn, table) == {}                              # the registry follows the table
-    finally:
-        conn.execute(f"DROP TABLE {table}")
-        conn.execute("DELETE FROM collections WHERE name = 'pytest__tmp'")
+    name = qdrant.ensure_collection(client, ident)
+    level = np.where(np.arange(len(tiles)) < 3, "region", "prototype")
+    payload = lambda sid: pd.DataFrame({"slide_id": sid, "level": level, "idx": np.arange(len(tiles)),  # noqa: E731
+                                        "label": np.where(np.arange(len(tiles)) == 7, "tumor", None)})
+    for _ in range(2):
+        assert qdrant.upsert_slide(client, name, "s1", feats, payload("s1"), batch=5) == len(tiles)
+    qdrant.upsert_slide(client, name, "s2", feats + 0.01, payload("s2"))
+    assert qdrant.count(client, name) == 2 * len(tiles)
+    assert qdrant.counts(client, name) == {"s1": len(tiles), "s2": len(tiles)}
+    assert client.count(qdrant.names(name)["region"]).count == 2 * 3
+    hit = qdrant.search(client, name, feats[7], "prototype", k=1)
+    assert (hit.slide_id[0], hit.idx[0], hit.label[0]) == ("s1", 7, "tumor")
+    assert hit.distance[0] == pytest.approx(0, abs=1e-3)       # float16 vectors
+    assert set(qdrant.search(client, name, feats[7], "prototype", k=3, exclude_slide="s1").slide_id) == {"s2"}
+    assert 7 not in set(qdrant.search(client, name, feats[7], "region", k=10).idx)    # levels apart
+    with pytest.raises(RuntimeError, match="rebuild"):                    # same collection, other dim
+        qdrant.ensure_collection(client, {**ident, "dim": 16})
+    qdrant.ensure_collection(client, ident, rebuild=True)
+    assert qdrant.count(client, name) == 0

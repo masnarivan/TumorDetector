@@ -12,14 +12,14 @@ Questo repository è alla fase F0: lo scheletro riproducibile su cui si innestan
 |---|---|---|
 | M0 Ingestione | Manifest CAMELYON16 nello schema comune; i vetrini con metadati mancanti sono bloccati con motivo | `tumordetector/data` |
 | M1 Controllo qualità | Maschera del tessuto ed esito `pass` / `refer` con motivo. Gli artefatti (GrandQC) non sono ancora rilevati | `tumordetector/qc` |
-| M2 Embedding | Backbone scelto da configurazione, estrazione deterministica e riprendibile, store su disco e in pgvector | `tumordetector/backbones`, `embed`, `vectordb` |
+| M2 Embedding | Backbone scelto da configurazione, estrazione deterministica e riprendibile, store su disco; nel vector DB (Qdrant) regioni e prototipi per vetrino | `tumordetector/backbones`, `embed`, `vectordb` |
 | Baseline | ABMIL a livello di vetrino sugli embedding, con protocollo di validazione, report automatico e registry MLflow | `tumordetector/mil` |
 | M3–M9 | Non iniziati | |
 
 ## Pipeline
 
 ```
-manifest ──> stream ──────────────────────┬──> index      PostgreSQL + pgvector
+manifest ──> stream ──────────────────────┬──> index      Qdrant: regioni + prototipi
   (git)      data/tiles, data/qc,         │
              data/embeddings/<backbone>   └──> baseline   data/reports/<backbone>/abmil
 splits (git) ─────────────────────────────────┘
@@ -33,14 +33,16 @@ embedding (`data/embeddings/<backbone>/<vetrino>.json`); ogni estrazione è una 
 
 ## Uso
 
-Servono [uv](https://docs.astral.sh/uv/) e Docker.
+Serve [uv](https://docs.astral.sh/uv/). Il vector DB è un cluster Qdrant: URL e API key vanno in
+`.env` (escluso da git), letto da `td` all'avvio:
 
-```bash
-uv sync
+```
+TD_QDRANT_URL=https://<cluster>.cloud.qdrant.io
+TD_QDRANT_API_KEY=<chiave>
 ```
 
 ```bash
-docker compose up -d
+uv sync
 ```
 
 ```bash
@@ -129,14 +131,29 @@ Il notebook `notebooks/extract_colab.ipynb` lo esegue con gli embedding su Googl
 
 ## Vector DB
 
-`td task=index` carica in pgvector gli embedding presenti su disco (tutti quelli del manifest, anche
-se il `.tif` non c'è più). Carica solo i vetrini nuovi o cambiati, riconosciuti dall'hash degli
-embedding; in un caricamento in blocco l'indice HNSW viene costruito una volta sola alla fine. I
-vettori sono `halfvec` (float16, come su disco). Dopo un cambio di schema la tabella va ricreata:
+Le tile restano su disco (`data/embeddings`). `td task=index` carica in Qdrant, per ogni vetrino,
+due livelli (`tumordetector/vectordb/reduce.py`), circa 400 vettori invece di ~10 mila:
+
+- regioni: media degli embedding di ogni quadrato di 8 × 8 tile (~0,9 mm) con almeno 16 tile, per
+  cercare casi simili su aree più grandi di una tile;
+- prototipi: 256 tile scelte con k-center (ognuna è la più lontana da quelle già scelte), così
+  anche il tessuto raro, tumore compreso, è rappresentato. In E3 sono un riferimento OOD buono
+  quanto tutte le tile (`docs/esperimenti.md`).
+
+Una collection per versione del backbone; ogni punto ha come payload vetrino, dataset, centro,
+diagnosi, livello e posizione. Carica solo i vetrini nuovi, cambiati o caricati a metà, confrontando
+l'hash degli embedding e il numero di punti sul server con `data/index/<backbone>.json`. Per
+ricaricare tutto:
 
 ```bash
 uv run td task=index vectordb.rebuild=true
 ```
+
+Su una rete che ispeziona il TLS il certificato è firmato da una CA aziendale installata nel
+sistema: il client verifica il TLS con il trust store del sistema operativo (`truststore`).
+
+Il PostgreSQL + pgvector di `docker-compose.yml` serve solo a riprodurre E3
+(`experiments/e3_ood.py`).
 
 ## Licenze e dipendenze
 

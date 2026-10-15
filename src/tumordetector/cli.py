@@ -5,7 +5,7 @@ tumordetector/tasks/, so a DVC stage depends only on the code it runs (tests/tes
   td task=tile                         tissue mask, QC verdict and tile grid per local slide (development)
   td task=embed backbone=phikon        embeddings per local slide, resumable (development)
   td task=stream backbone=phikon       download -> tile -> embed -> delete, slide by slide: the full dataset
-  td task=index backbone=phikon        embeddings -> pgvector
+  td task=index backbone=phikon        regions + k-center prototypes per slide -> Qdrant
   td task=splits                       data/manifests/<dataset>_splits.csv (cross-validation folds)
   td task=train backbone=phikon        ABMIL baseline, validation report, model registry
   td task=verify backbone=phikon       outputs on disk agree with their per-slide provenance
@@ -20,10 +20,22 @@ from pathlib import Path
 from hydra import compose, initialize_config_dir
 
 CONF_DIR = Path(os.environ.get("TD_CONF", Path(__file__).resolve().parents[2] / "conf"))
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "train", "verify")
 
 
+def load_env(path: Path = ENV_FILE):
+    """KEY=value lines of the repo's .env (gitignored: credentials) into the environment, without
+    overriding variables already set."""
+    if path.exists():
+        for line in path.read_text().splitlines():
+            key, sep, value = line.strip().partition("=")
+            if sep and not key.startswith("#"):
+                os.environ.setdefault(key.strip(), value.strip().strip("'\""))
+
+
 def main(argv: list[str] | None = None):
+    load_env()
     with initialize_config_dir(str(CONF_DIR), version_base=None):
         cfg = compose("config", overrides=sys.argv[1:] if argv is None else argv)
     if cfg.get("task") not in TASKS:

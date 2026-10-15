@@ -26,11 +26,15 @@ embed:
   dtype: float16
   device: auto       # auto | cuda | mps | cpu
 
-vectordb:
-  dsn: ${oc.env:TD_PG_DSN,postgresql://td:td_dev@localhost:5433/tumordetector}
-  rebuild: false                 # drop and reload the collection's table (needed after a schema change)
-  maintenance_work_mem: 4GB      # HNSW build: the graph should fit, and stay below the container's shm_size
-  index_workers: 7
+vectordb:            # Qdrant; the API key comes from the environment (TD_QDRANT_API_KEY in .env), never from here
+  url: ${oc.env:TD_QDRANT_URL,http://localhost:6333}
+  rebuild: false     # drop and reload the backbone's collection
+  batch: 256         # points per upload request
+
+index:               # what of each slide goes into the database (vectordb/reduce.py)
+  region_tiles: 8    # regions of 8 x 8 tiles (~0.9 mm at 0.5 mpp), mean embedding
+  min_region_tiles: 16
+  prototypes: 256    # k-center tiles per slide: in E3 as good an OOD reference as all the tiles
 
 mlflow:
   tracking_uri: sqlite:///mlflow.db

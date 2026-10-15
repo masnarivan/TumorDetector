@@ -2,7 +2,7 @@
 # Each stage depends on exactly the code it runs and the config it reads (checked by tests/test_dvc.py).
 #
 #   stream  -> data/tiles, data/qc, data/embeddings/<backbone>   the whole manifest, slide by slide
-#   index   -> PostgreSQL + data/index/<backbone>.json
+#   index   -> Qdrant (regions + k-center prototypes per slide) + data/index/<backbone>.json
 #   baseline-> data/reports/<backbone>/abmil
 #
 # Not stages:
@@ -32,6 +32,7 @@ stages:
       - src/tumordetector/tasks/common.py
       - src/tumordetector/io.py
       - src/tumordetector/data/camelyon16.py
+      - src/tumordetector/data/camelyon17.py
       - src/tumordetector/data/camelyon_annotations.py
       - src/tumordetector/qc/tissue.py
       - src/tumordetector/wsi/tiling.py
@@ -62,8 +63,11 @@ stages:
       - src/tumordetector/tasks/common.py
       - src/tumordetector/io.py
       - src/tumordetector/embed/store.py
-      - src/tumordetector/vectordb/pg.py
+      - src/tumordetector/vectordb/qdrant.py
+      - src/tumordetector/vectordb/reduce.py
     params:
+      - conf/config.yaml:
+          - index
       - conf/data/camelyon16.yaml:
           - slides
     outs:
