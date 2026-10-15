@@ -366,6 +366,8 @@ def task_train(cfg: DictConfig):
     from tumordetector.mil import report
     from tumordetector.mil.evaluate import gate, run_protocol
 
+    code = code_version()   # at the start: a commit made while training must not be credited
+
     out = Path(cfg.paths.out)
     root = out / "embeddings" / cfg.backbone.name
     ident = read_json(root / "collection.json")
@@ -382,7 +384,7 @@ def task_train(cfg: DictConfig):
     hyper = {k: cfg.mil[k] for k in ("hidden", "dropout", "lr", "weight_decay", "epochs", "max_tiles", "threshold")}
     context = {"Modello": model_name, "Collezione embedding": ident["collection"],
                "Versione backbone": ident["version"], "Split": f"{splits_path(cfg)} (seed {cfg.seed})",
-               "Iperparametri": hyper, "Versione codice": code_version()}
+               "Iperparametri": hyper, "Versione codice": code}
 
     rep = out / "reports" / cfg.backbone.name / "abmil"
     rep.mkdir(parents=True, exist_ok=True)
