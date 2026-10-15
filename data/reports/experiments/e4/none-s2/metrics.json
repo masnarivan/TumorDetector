@@ -1,0 +1,95 @@
+{
+ "attention_auroc_mean": 0.985068958186821,
+ "cv": {
+  "auroc": 0.9925208227095021,
+  "balanced_accuracy": 0.9689784123746388,
+  "brier": 0.027410779923104298,
+  "ece": 0.031059511646275587,
+  "n": 270,
+  "n_pos": 111,
+  "sensitivity": 0.9819819819819819,
+  "specificity": 0.9559748427672956
+ },
+ "cv_by_center": {
+  "radboud": {
+   "auroc": 0.9869014084507043,
+   "balanced_accuracy": 0.9629577464788732,
+   "brier": 0.03721101333641665,
+   "ece": 0.03971087728554564,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 0.9859154929577465,
+   "specificity": 0.94
+  },
+  "utrecht": {
+   "auroc": 0.9995762711864408,
+   "balanced_accuracy": 0.9790254237288136,
+   "brier": 0.010483104027382948,
+   "ece": 0.01764935466038273,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 0.975,
+   "specificity": 0.9830508474576272
+  }
+ },
+ "gate": {
+  "reasons": [],
+  "status": "passed"
+ },
+ "loco": {
+  "held-out radboud": {
+   "auroc": 0.9884507042253522,
+   "balanced_accuracy": 0.9179577464788733,
+   "brier": 0.06955983110749145,
+   "ece": 0.11214527815215465,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 0.9859154929577465,
+   "specificity": 0.85
+  },
+  "held-out utrecht": {
+   "auroc": 1.0,
+   "balanced_accuracy": 0.9661016949152542,
+   "brier": 0.04462971933227712,
+   "ece": 0.12285443152667899,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 1.0,
+   "specificity": 0.9322033898305084
+  }
+ },
+ "loco_worst_auroc": 0.9884507042253522,
+ "n_slides": 399,
+ "test": {
+  "auroc": 0.9954081632653061,
+  "balanced_accuracy": 0.9318877551020408,
+  "brier": 0.039037607615543396,
+  "ece": 0.05741283357923566,
+  "n": 129,
+  "n_pos": 49,
+  "sensitivity": 0.9387755102040817,
+  "specificity": 0.925
+ },
+ "test_by_center": {
+  "radboud": {
+   "auroc": 0.99,
+   "balanced_accuracy": 0.8983333333333333,
+   "brier": 0.06240366914412259,
+   "ece": 0.09964930655936571,
+   "n": 74,
+   "n_pos": 24,
+   "sensitivity": 0.9166666666666666,
+   "specificity": 0.88
+  },
+  "utrecht": {
+   "auroc": 1.0,
+   "balanced_accuracy": 0.98,
+   "brier": 0.00759963392254594,
+   "ece": 0.013294290648297052,
+   "n": 55,
+   "n_pos": 25,
+   "sensitivity": 0.96,
+   "specificity": 1.0
+  }
+ }
+}

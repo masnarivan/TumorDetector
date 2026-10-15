@@ -1,0 +1,95 @@
+{
+ "attention_auroc_mean": 0.9335517718472907,
+ "cv": {
+  "auroc": 0.9746161255595217,
+  "balanced_accuracy": 0.9307326194118647,
+  "brier": 0.060110588209921635,
+  "ece": 0.06312918479313498,
+  "n": 270,
+  "n_pos": 111,
+  "sensitivity": 0.9369369369369369,
+  "specificity": 0.9245283018867925
+ },
+ "cv_by_center": {
+  "radboud": {
+   "auroc": 0.962112676056338,
+   "balanced_accuracy": 0.9147887323943662,
+   "brier": 0.07368296505915131,
+   "ece": 0.07794270219779406,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 0.9295774647887324,
+   "specificity": 0.9
+  },
+  "utrecht": {
+   "auroc": 0.9949152542372881,
+   "balanced_accuracy": 0.958050847457627,
+   "brier": 0.03666739183397948,
+   "ece": 0.03826008695570197,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 0.95,
+   "specificity": 0.9661016949152542
+  }
+ },
+ "gate": {
+  "reasons": [],
+  "status": "passed"
+ },
+ "loco": {
+  "held-out radboud": {
+   "auroc": 0.9933802816901409,
+   "balanced_accuracy": 0.935,
+   "brier": 0.07335940331829781,
+   "ece": 0.1405868755805998,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 1.0,
+   "specificity": 0.87
+  },
+  "held-out utrecht": {
+   "auroc": 0.9885593220338983,
+   "balanced_accuracy": 0.9241525423728814,
+   "brier": 0.0590576276277239,
+   "ece": 0.06961697425618016,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 0.95,
+   "specificity": 0.8983050847457628
+  }
+ },
+ "loco_worst_auroc": 0.9885593220338983,
+ "n_slides": 399,
+ "test": {
+  "auroc": 0.9872448979591837,
+  "balanced_accuracy": 0.9466836734693878,
+  "brier": 0.03524425604020728,
+  "ece": 0.03630826171871563,
+  "n": 129,
+  "n_pos": 49,
+  "sensitivity": 0.9183673469387755,
+  "specificity": 0.975
+ },
+ "test_by_center": {
+  "radboud": {
+   "auroc": 0.9775,
+   "balanced_accuracy": 0.9383333333333332,
+   "brier": 0.04844402466013969,
+   "ece": 0.052757216495346926,
+   "n": 74,
+   "n_pos": 24,
+   "sensitivity": 0.9166666666666666,
+   "specificity": 0.96
+  },
+  "utrecht": {
+   "auroc": 1.0,
+   "balanced_accuracy": 0.96,
+   "brier": 0.017484567351570935,
+   "ece": 0.03467666252981871,
+   "n": 55,
+   "n_pos": 25,
+   "sensitivity": 0.92,
+   "specificity": 1.0
+  }
+ }
+}

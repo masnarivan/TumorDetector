@@ -7,11 +7,12 @@ from omegaconf import OmegaConf
 
 from tumordetector import cli
 from tumordetector.embed import store
+from tumordetector.mil.abmil import ABMIL
 from tumordetector.mil.evaluate import binary_metrics, ece, gate, make_cv_folds, run_protocol
 
 DIM = 16
 MIL = OmegaConf.create({"hidden": 32, "dropout": 0.0, "lr": 2e-3, "weight_decay": 0.0, "epochs": 12,
-                        "max_tiles": 256, "threshold": 0.5, "folds": 4, "device": "cpu"})
+                        "max_tiles": 256, "threshold": 0.5, "folds": 4, "device": "cpu", "normalize": "none"})
 GATE = OmegaConf.create({"min_slides": 20, "min_cv_auroc": 0.9, "min_loco_worst_auroc": 0.85,
                          "min_test_auroc": 0.9, "max_ece": 0.5})
 
@@ -69,6 +70,23 @@ def test_protocol_learns_the_planted_signal_and_passes_the_gate():
     assert verdict["status"] == "failed" and "ECE" in verdict["reasons"][0]
 
 
+def test_slide_mean_normalisation_ignores_what_every_tile_shares():
+    torch = pytest.importorskip("torch")
+    x = torch.randn(50, DIM)
+    shift = 3 * torch.randn(1, DIM)                       # a centre: the same offset on every tile
+    norm, raw = ABMIL(DIM, 32, 0.0, "slide_mean").eval(), ABMIL(DIM, 32, 0.0).eval()
+    assert torch.allclose(norm(x)[0], norm(x + shift)[0], atol=1e-5)
+    assert not torch.allclose(raw(x)[0], raw(x + shift)[0], atol=1e-3)
+    with pytest.raises(ValueError):
+        ABMIL(DIM, normalize="centre")
+
+
+def test_protocol_learns_the_planted_signal_with_slide_mean_normalisation():
+    table, bags, labels = synthetic()
+    result = run_protocol(table, bags, labels.__getitem__, OmegaConf.merge(MIL, {"normalize": "slide_mean"}), seed=0)
+    assert result["metrics"]["test"]["auroc"] > 0.95
+
+
 def test_protocol_reports_what_it_cannot_run():
     table, bags, labels = synthetic()
     few = table[(table.split == "train") & (table.label == 1)].head(4)   # one class, no test split
@@ -111,3 +129,9 @@ def test_cli_train_writes_report_and_registers_a_candidate(tmp_path, monkeypatch
     assert version.tags["validation_status"] == "insufficient_data"
     with pytest.raises(mlflow.exceptions.MlflowException):          # not validated: the alias does not exist
         client.get_model_version_by_alias("abmil-camelyon16-dummy", "validated")
+
+    # an experiment run: its own report folder, nothing added to the registry
+    cli.main(["task=train", *common, "mil.register=false", "mil.normalize=slide_mean",
+              f"mil.report_dir={tmp_path / 'exp'}"])
+    assert (tmp_path / "exp/report.md").exists() and "slide_mean" in (tmp_path / "exp/report.md").read_text()
+    assert len(client.search_model_versions("name='abmil-camelyon16-dummy'")) == 1

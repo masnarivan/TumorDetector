@@ -46,7 +46,10 @@ mil:                 # ABMIL baseline on frozen embeddings
   threshold: 0.5
   folds: 5
   device: cpu        # small model: the CPU is fast enough and deterministic
+  normalize: none    # none | slide_mean: subtract each slide's mean tile (experiment E4)
   experiment: baseline-abmil
+  report_dir: null   # null = data/reports/<backbone>/abmil; experiments write elsewhere
+  register: true     # false for experiments: no model in the registry, no alias
   overwrite_splits: false
 
 gate:                # promotion battery: initial proposals, to be agreed with the pathologists

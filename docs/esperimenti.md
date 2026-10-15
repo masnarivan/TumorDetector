@@ -9,6 +9,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E1 | Fughe di dati tra split: quasi-duplicati tra sviluppo e test | fatto: nessun duplicato | se l'AUROC 0.993 sul test è credibile |
 | E2 | Probe sul centro (Robustness Index) a livello tile, regione, vetrino | fatto: centro codificato ovunque | se e quanto mitigare l'effetto centro |
 | E3 | OOD con DB completo, sottoinsieme k-center e regioni | da fare | il ridisegno del vector DB |
+| E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -158,6 +159,78 @@ Sui vetrini tumorali di Radboud escluso, il 10° percentile scende a 0,07 (contr
 - Il problema del baseline è uno spostamento in blocco: con Utrecht escluso, l'intera distribuzione
   dei normali di Utrecht sale (mediana da 0,000 a 0,388). Coerente con la mancata calibrazione.
 
+
+## E4 — Mitigazione: normalizzazione per vetrino nel baseline
+
+**Domanda.** Sottrarre a ogni tile la media del suo vetrino (E2: toglie il centro al probe lineare,
+costa 0,014 al probe tumore/normale) migliora la calibrazione e la specificità del baseline ABMIL su
+un centro mai visto, senza perdere capacità di distinguere?
+
+**Perché è applicabile in esercizio.** La media si calcola dal vetrino stesso: nessuna statistica
+del centro, nessun dato esterno. La normalizzazione sta dentro il modello (`mil.normalize`), quindi
+il modello registrato la applica da sé.
+
+**Rischio noto.** In un vetrino quasi tutto tumorale la media è "tumore": sottrarla può ridurre il
+segnale proprio nelle macrometastasi. Si guarda la sensibilità per centro.
+
+**Disegno.** Due varianti, `none` e `slide_mean`, stesso codice, stessi split, stessi iperparametri,
+tre semi (0, 1, 2) ciascuna: sei addestramenti con lo stesso protocollo del baseline (CV a 5 fold,
+leave-one-centre-out, test). Nessuna variante viene registrata nel registry.
+
+**Esiti, media sui tre semi.**
+
+- Primario: ECE peggiore in leave-one-centre-out (il massimo tra i due centri esclusi).
+- Co-primari: AUROC peggiore in leave-one-centre-out; AUROC sullo split di test.
+- Secondari: specificità e sensibilità per centro escluso; specificità di Utrecht nel test; ECE e
+  AUROC in CV; AUROC dell'attenzione.
+
+**Criterio** (fissato ora). `slide_mean` è adottata se l'ECE peggiore in leave-one-centre-out scende
+di almeno 0,05, l'AUROC peggiore in leave-one-centre-out non scende più di 0,02 e l'AUROC di test non
+scende più di 0,01. Si riportano anche i valori di ogni seme.
+
+**Risultati** (codice `7712fdb+dirty`, 2026-10-15: le modifiche non committate sono quelle di questo
+esperimento; il seme cambia anche i fold di CV, mentre leave-one-centre-out e test sono fissi).
+
+| Metrica | none s0 | s1 | s2 | slide_mean s0 | s1 | s2 | media none | media slide_mean | Δ |
+|---|---|---|---|---|---|---|---|---|---|
+| **ECE peggiore LOCO** | 0,126 | 0,190 | 0,123 | 0,130 | 0,141 | 0,222 | 0,146 | 0,164 | **+0,018** |
+| ECE, Radboud escluso | 0,087 | 0,039 | 0,112 | 0,130 | 0,141 | 0,091 | 0,079 | 0,121 | +0,041 |
+| ECE, Utrecht escluso | 0,126 | 0,190 | 0,123 | 0,091 | 0,070 | 0,222 | 0,146 | 0,128 | −0,019 |
+| **AUROC peggiore LOCO** | 0,945 | 0,986 | 0,988 | 0,983 | 0,989 | 0,966 | 0,973 | 0,979 | **+0,006** |
+| **AUROC test** | 0,995 | 0,997 | 0,995 | 0,988 | 0,987 | 0,985 | 0,996 | 0,987 | **−0,009** |
+| Sensibilità, Radboud escluso | 0,901 | 0,901 | 0,986 | 0,986 | 1,000 | 0,972 | 0,930 | 0,986 | +0,056 |
+| Specificità, Radboud escluso | 0,820 | 0,980 | 0,850 | 0,920 | 0,870 | 0,950 | 0,883 | 0,913 | +0,030 |
+| Sensibilità, Utrecht escluso | 0,975 | 1,000 | 1,000 | 0,975 | 0,950 | 0,950 | 0,992 | 0,958 | −0,033 |
+| Specificità, Utrecht escluso | 0,898 | 0,763 | 0,932 | 0,881 | 0,898 | 0,610 | 0,864 | 0,797 | −0,068 |
+| Specificità Utrecht, test | 0,933 | 1,000 | 1,000 | 1,000 | 1,000 | 1,000 | 0,978 | 1,000 | +0,022 |
+| AUROC CV | 0,987 | 0,989 | 0,993 | 0,976 | 0,975 | 0,994 | 0,989 | 0,982 | −0,008 |
+| ECE CV | 0,049 | 0,040 | 0,031 | 0,047 | 0,063 | 0,034 | 0,040 | 0,048 | +0,008 |
+| AUROC attenzione | 0,992 | 0,990 | 0,985 | 0,938 | 0,934 | 0,952 | 0,989 | 0,941 | −0,048 |
+
+Tutte e sei le esecuzioni superano la batteria del gate.
+
+**Esito: `slide_mean` non è adottata.** L'esito primario va nella direzione sbagliata (ECE peggiore in
+leave-one-centre-out +0,018 invece di −0,05); i due co-primari restano nei margini (+0,006 e −0,009).
+
+**Lettura.**
+
+- La normalizzazione non toglie l'errore di calibrazione tra centri, lo sposta: migliora il caso
+  "Radboud mai visto" (AUROC 0,973 → 0,993, sensibilità +0,056) e peggiora "Utrecht mai visto"
+  (specificità −0,068, con un seme a 0,610).
+- Costa localizzazione: l'AUROC dell'attenzione scende di quasi 0,05. Coerente con il rischio
+  annotato: sottraendo la media, la tile tumorale si riconosce solo per differenza dal resto del
+  vetrino.
+- **La variabilità tra semi è grande quanto l'effetto cercato.** Con `none` l'ECE peggiore va da 0,123
+  a 0,190. Lo stesso seme 0 con la stessa configurazione del baseline registrato
+  (`data/reports/phikon/abmil`) dà ECE con Utrecht escluso 0,126 invece di 0,235 e specificità di
+  Utrecht nel test 0,933 invece di 0,70: l'addestramento non è riproducibile da un'esecuzione
+  all'altra (qui con `OMP_NUM_THREADS=1`, il baseline con i thread di default). Il numero singolo del
+  baseline va quindi letto con un'incertezza di questo ordine, e il gate deve considerarla.
+
+**Conseguenze.** (1) Il problema di calibrazione tra centri resta aperto: le strade successive sono
+la ricalibrazione per centro (temperature scaling con pochi vetrini del nuovo centro) e il rinvio
+OOD (E3). (2) Rendere l'addestramento deterministico, o riportare le metriche del gate come media e
+intervallo su più semi, prima di usare differenze di pochi centesimi per decidere.
 
 ## E3 — OOD: quanto si perde indicizzando un sottoinsieme
 

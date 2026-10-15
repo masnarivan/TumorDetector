@@ -375,18 +375,20 @@ def task_train(cfg: DictConfig):
     table = table[table.slide_id.isin(store.list_slides(root))].reset_index(drop=True)
     if table.empty:
         raise SystemExit(f"no embeddings in {root}")
-    bags = {s: np.load(root / f"{s}.npy") for s in table.slide_id}
+    # memory-mapped: parallel runs share one copy of the embeddings in the page cache
+    bags = {s: np.load(root / f"{s}.npy", mmap_mode="r") for s in table.slide_id}
 
     result = run_protocol(table, bags, lambda s: pd.read_parquet(root / f"{s}.parquet").label.to_numpy(),
                           cfg.mil, cfg.seed)
     verdict = gate(result["metrics"], result["n_slides"], cfg.gate)
     model_name = f"abmil-{cfg.data.name}-{cfg.backbone.name}"
-    hyper = {k: cfg.mil[k] for k in ("hidden", "dropout", "lr", "weight_decay", "epochs", "max_tiles", "threshold")}
+    hyper = {k: cfg.mil[k] for k in ("hidden", "dropout", "lr", "weight_decay", "epochs", "max_tiles", "threshold",
+                                     "normalize")}
     context = {"Modello": model_name, "Collezione embedding": ident["collection"],
                "Versione backbone": ident["version"], "Split": f"{splits_path(cfg)} (seed {cfg.seed})",
                "Iperparametri": hyper, "Versione codice": code}
 
-    rep = out / "reports" / cfg.backbone.name / "abmil"
+    rep = Path(cfg.mil.report_dir) if cfg.mil.report_dir else out / "reports" / cfg.backbone.name / "abmil"
     rep.mkdir(parents=True, exist_ok=True)
     (rep / "report.md").write_text(report.render(result, verdict, context))
     write_json(rep / "metrics.json", {"gate": verdict, "n_slides": result["n_slides"], **result["metrics"]})
@@ -406,9 +408,11 @@ def task_train(cfg: DictConfig):
                 "attention_auroc_mean": m["attention_auroc_mean"]}
         mlflow.log_metrics({k: v for k, v in flat.items() if v is not None})
         mlflow.set_tag("validation_status", verdict["status"])
+        mlflow.set_tag("registered", str(bool(cfg.mil.register)).lower())
         mlflow.log_artifacts(str(rep), artifact_path="validation")
         if result["model"] is not None:
             torch.save(result["model"].state_dict(), rep / "model.pt")
+        if result["model"] is not None and cfg.mil.register:
             # A few real tiles as the input example: the saved graph keeps the number of tiles free.
             example = next(iter(bags.values()))[:8].astype(np.float32)
             # The signature is given explicitly: MLflow cannot infer one from a model that returns

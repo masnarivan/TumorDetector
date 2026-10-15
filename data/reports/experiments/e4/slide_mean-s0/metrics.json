@@ -1,0 +1,95 @@
+{
+ "attention_auroc_mean": 0.937775064206914,
+ "cv": {
+  "auroc": 0.9759193155419571,
+  "balanced_accuracy": 0.9550399456059834,
+  "brier": 0.04045302923470106,
+  "ece": 0.04676501116743345,
+  "n": 270,
+  "n_pos": 111,
+  "sensitivity": 0.972972972972973,
+  "specificity": 0.9371069182389937
+ },
+ "cv_by_center": {
+  "radboud": {
+   "auroc": 0.9714084507042253,
+   "balanced_accuracy": 0.9409154929577466,
+   "brier": 0.0544609172133217,
+   "ece": 0.06335380587132297,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 0.971830985915493,
+   "specificity": 0.91
+  },
+  "utrecht": {
+   "auroc": 0.9872881355932204,
+   "balanced_accuracy": 0.9790254237288136,
+   "brier": 0.01625758636253811,
+   "ece": 0.018621099264189048,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 0.975,
+   "specificity": 0.9830508474576272
+  }
+ },
+ "gate": {
+  "reasons": [],
+  "status": "passed"
+ },
+ "loco": {
+  "held-out radboud": {
+   "auroc": 0.9933802816901408,
+   "balanced_accuracy": 0.9529577464788732,
+   "brier": 0.0563597199054206,
+   "ece": 0.12975947541451593,
+   "n": 171,
+   "n_pos": 71,
+   "sensitivity": 0.9859154929577465,
+   "specificity": 0.92
+  },
+  "held-out utrecht": {
+   "auroc": 0.9826271186440678,
+   "balanced_accuracy": 0.9281779661016949,
+   "brier": 0.05870809978866379,
+   "ece": 0.0911062927352208,
+   "n": 99,
+   "n_pos": 40,
+   "sensitivity": 0.975,
+   "specificity": 0.8813559322033898
+  }
+ },
+ "loco_worst_auroc": 0.9826271186440678,
+ "n_slides": 399,
+ "test": {
+  "auroc": 0.988265306122449,
+  "balanced_accuracy": 0.9420918367346939,
+  "brier": 0.05689189843448154,
+  "ece": 0.06447690496838906,
+  "n": 129,
+  "n_pos": 49,
+  "sensitivity": 0.9591836734693877,
+  "specificity": 0.925
+ },
+ "test_by_center": {
+  "radboud": {
+   "auroc": 0.9783333333333333,
+   "balanced_accuracy": 0.9191666666666667,
+   "brier": 0.08868207814236556,
+   "ece": 0.11364907597079937,
+   "n": 74,
+   "n_pos": 24,
+   "sensitivity": 0.9583333333333334,
+   "specificity": 0.88
+  },
+  "utrecht": {
+   "auroc": 0.9986666666666667,
+   "balanced_accuracy": 0.98,
+   "brier": 0.014119656645692107,
+   "ece": 0.025813346051621573,
+   "n": 55,
+   "n_pos": 25,
+   "sensitivity": 0.96,
+   "specificity": 1.0
+  }
+ }
+}

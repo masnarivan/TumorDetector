@@ -8,10 +8,19 @@ import numpy as np
 import torch
 from torch import nn
 
+NORMALIZE = ("none", "slide_mean")
+
 
 class ABMIL(nn.Module):
-    def __init__(self, dim: int, hidden: int = 256, dropout: float = 0.25):
+    """`normalize="slide_mean"` subtracts the bag's mean tile before anything else: it removes what
+    every tile of the slide shares (stain, scanner: the centre, see experiment E2), computed from the
+    slide itself. It lives in the model, so a saved model applies it on its own."""
+
+    def __init__(self, dim: int, hidden: int = 256, dropout: float = 0.25, normalize: str = "none"):
         super().__init__()
+        if normalize not in NORMALIZE:
+            raise ValueError(f"normalize must be one of {NORMALIZE}, not {normalize!r}")
+        self.normalize = normalize
         self.embed = nn.Sequential(nn.Linear(dim, hidden), nn.ReLU(), nn.Dropout(dropout))
         self.att_v = nn.Linear(hidden, hidden // 2)
         self.att_u = nn.Linear(hidden, hidden // 2)
@@ -20,6 +29,8 @@ class ABMIL(nn.Module):
 
     def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """(n_tiles, dim) -> slide logit (scalar) and attention weights (n_tiles,), summing to 1."""
+        if self.normalize == "slide_mean":
+            x = x - x.mean(dim=0, keepdim=True)
         h = self.embed(x)
         scores = self.att_w(torch.tanh(self.att_v(h)) * torch.sigmoid(self.att_u(h))).squeeze(-1)
         weights = torch.softmax(scores, dim=0)
@@ -31,7 +42,7 @@ def fit(bags: list[np.ndarray], labels: np.ndarray, cfg, seed: int, device: str 
     validation set inside a fold, and picking the epoch on the test fold would leak."""
     torch.manual_seed(seed)
     rng = np.random.default_rng(seed)
-    model = ABMIL(bags[0].shape[1], cfg.hidden, cfg.dropout).to(device)
+    model = ABMIL(bags[0].shape[1], cfg.hidden, cfg.dropout, cfg.normalize).to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
     n_pos = int(labels.sum())
     pos_weight = torch.tensor((len(labels) - n_pos) / max(n_pos, 1), dtype=torch.float32, device=device)
