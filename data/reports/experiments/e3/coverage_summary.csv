@@ -1,0 +1,6 @@
+,radius,radius,radius,radius,radius,radius,radius,radius,represented_median,represented_median,represented_median,represented_median,represented_median,represented_median,represented_median,represented_median,represented_max,represented_max,represented_max,represented_max,represented_max,represented_max,represented_max,represented_max
+,count,mean,std,min,10%,50%,90%,max,count,mean,std,min,10%,50%,90%,max,count,mean,std,min,10%,50%,90%,max
+N,,,,,,,,,,,,,,,,,,,,,,,,
+64,102.0,0.79,0.059,0.587,0.717,0.803,0.854,0.873,102.0,42.387,22.969,5.0,14.6,38.75,73.45,104.5,102.0,2314.686,2024.634,54.0,363.1,1687.0,5112.7,11245.0
+256,102.0,0.662,0.06,0.438,0.586,0.674,0.724,0.741,102.0,11.176,5.686,1.0,5.0,11.0,18.0,29.0,102.0,1234.804,1341.918,13.0,125.7,819.5,2396.1,8371.0
+1024,102.0,0.538,0.11,0.002,0.461,0.565,0.618,0.628,102.0,3.186,1.499,1.0,1.0,3.0,5.0,7.0,102.0,536.755,568.221,1.0,39.3,381.0,1212.1,2939.0

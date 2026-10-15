@@ -8,7 +8,8 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 |---|---|---|---|
 | E1 | Fughe di dati tra split: quasi-duplicati tra sviluppo e test | fatto: nessun duplicato | se l'AUROC 0.993 sul test è credibile |
 | E2 | Probe sul centro (Robustness Index) a livello tile, regione, vetrino | fatto: centro codificato ovunque | se e quanto mitigare l'effetto centro |
-| E3 | OOD con DB completo, sottoinsieme k-center e regioni | da fare | il ridisegno del vector DB |
+| E3 | OOD con DB completo, sottoinsieme k-center e regioni | fatto: k-center basta, il punteggio no | il ridisegno del vector DB |
+| E3b | Punteggio OOD indipendente dalla composizione del tessuto | protocollo scritto | come rinviare un vetrino OOD |
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
@@ -299,5 +300,154 @@ quantizzato. Le regioni sono adottate per l'OOD se rispettano lo stesso margine.
 
 **Limiti.** Due soli centri; un solo backbone; l'OOD simulato è uno spostamento di dominio, non un
 caso clinicamente diverso. Da ripetere con CAMELYON17 e con OOD veri (altri organi, artefatti).
+
+**Aggiunta al protocollo (15/10/2026, dopo una prova di 35 interrogazioni della configurazione 4,
+prima di ogni risultato).** La prova: con l'indice HNSW sui 399 vetrini filtrato ai 102 di
+riferimento, 9 tile su 10 di un vetrino Utrecht (`test_001`) non ricevono **nessun** vicino: i loro
+vicini più prossimi sono tutti in vetrini esclusi dal filtro e la scansione iterativa si ferma a
+`hnsw.max_scan_tuples` (20 000, il default). Ogni interrogazione richiede 0,7–2,7 s. Quindi:
+
+- Configurazione 4, regola fissata ora: una tile senza vicino ha punteggio +∞ (rinvio: è ciò che
+  farebbe in esercizio un sistema che non trova riferimenti). Si riporta la frazione di tile senza
+  vicino per ruolo; le interrogazioni girano su 8 connessioni parallele.
+- Nuova configurazione 4b: indice HNSW costruito **solo** sulle tile dei 102 vetrini di riferimento
+  (tabella temporanea, stessi parametri dell'indice esistente: m 16, ef_construction 64; ef_search
+  200; nessun filtro), cioè il ridisegno candidato. Stesse 100 tile per vetrino interrogato.
+  Confrontata con la configurazione 1 sulle stesse tile; si riportano anche tempo di costruzione e
+  dimensione dell'indice.
+- Per le configurazioni 4 e 4b si riporta anche il recall: frazione di tile per cui l'indice trova
+  un vicino alla stessa distanza del vicino esatto (scarto ≤ 0,001).
+- Dettagli non fissati prima e fissati ora: il k-center parte da una tile a caso (seme fisso) e
+  N = 64, 256, 1024 sono prefissi della stessa sequenza greedy; il vettore di una regione è la media
+  delle sue tile, poi normalizzata L2; soglia conformal = il ⌈(n+1)(1−α)⌉-esimo punteggio di
+  calibrazione (n = 69: il 67°), rinvio se il punteggio la supera; per le differenze di AUROC dalla
+  configurazione 1 si riporta un intervallo bootstrap al 95% (2000 ricampionamenti dei vetrini,
+  stratificati per classe).
+
+**Risultati** (15/10/2026, codice `32e9a7c` + `experiments/e3_ood.py`; ricerca esatta su MPS in
+circa 5 minuti compreso il k-center; file in `data/reports/experiments/e3/`).
+
+| Configurazione | Vettori | MB (float16) | AUROC vetrino | AUROC tile | Falsi rinvii Radboud test | Rilevamento Utrecht |
+|---|---|---|---|---|---|---|
+| 1. Tutte le tile | 925 283 | 1355 | 1,000 | 0,998 | 0,135 (10/74) | 1,00 |
+| 2. k-center N = 64 | 6 528 | 10 | 1,000 | 0,997 | 0,162 | 1,00 |
+| **2. k-center N = 256** | **26 112** | **38** | **1,000** | **0,998** | **0,149 (11/74)** | **1,00** |
+| 2. k-center N = 1024 | 103 373 | 151 | 1,000 | 0,999 | 0,149 | 1,00 |
+| 3. Regioni 8×8 | 18 065 | 26 | 1,000 | 1,000 | 0,162 | 1,00 |
+
+Su 100 tile per vetrino (configurazioni 4 e 4b, confrontate con la ricerca esatta sulle stesse
+tile: AUROC 1,000, falsi rinvii 0,135):
+
+| | 4. HNSW su 399 vetrini, filtro sul riferimento | 4b. HNSW sul solo riferimento |
+|---|---|---|
+| Tile senza alcun vicino | calibrazione e Radboud 0%, **Utrecht 93%** | 0% |
+| Recall del vicino esatto | 0,95 sulle tile con risposta (0,71 su tutte) | 0,98 |
+| Secondi per interrogazione (mediana) | Radboud 0,08–0,17; **Utrecht 2,1** | 0,03 |
+| AUROC; falsi rinvii; rilevamento | 1,000; 0,135; 1,00 (per la regola +∞) | 1,000; 0,135; 1,00 |
+| Indice | 8,1 GB (esistente) | 1,8 GB, costruito in 142 s |
+
+- Il limite del k-center è rispettato su tutte le 98 741 tile interrogate (nessuna violazione; la
+  distanza dal sottoinsieme supera quella da tutte le tile in mediana di 0,10, 0,07, 0,04 per N 64,
+  256, 1024). Il raggio di copertura è però grande (N 256: mediana 0,67, contro 0,43 di distanza
+  tipica dal vicino): la garanzia teorica è troppo larga per essere utile, conta la misura.
+- Le differenze di AUROC dalla configurazione 1 sono tutte nulle o quasi (k-center 64: −0,0002,
+  IC 95% −0,0015…0): l'AUROC è al tetto, come previsto da E2.
+
+**Lettura secondo il criterio fissato.** Margine di AUROC: rispettato da tutte le configurazioni.
+Falsi rinvii entro 0,05 ± 0,03: **non rispettato da nessuna, compreso il riferimento completo**. Alla
+lettera il sottoinsieme N = 256 non è adottato, e nemmeno N = 1024. Il ripiego previsto (indice
+completo quantizzato) non risolverebbe: il riferimento completo fallisce allo stesso modo.
+
+**Analisi non previste dal protocollo** (ipotesi, da confermare).
+
+- 8 dei 10 falsi rinvii (riferimento completo) sono vetrini tumorali: falsi rinvii 0,04 sui 50
+  normali (2/50, in tutte le configurazioni), 0,33 sui 24 tumorali. Le tile tumorali distano dal
+  riferimento quanto in calibrazione (mediana 0,64 contro 0,64): non sono più "nuove" nel test, ma
+  il punteggio medio cresce con la quantità di tumore. Se calibrazione e test fossero scambiabili,
+  10 o più rinvii su 74 avrebbero probabilità 0,02.
+- Nei vetrini rinviati senza tumore campionato le mappe delle distanze mostrano lontano il tessuto
+  non linfoide (grasso, connettivo, capsula, vasi); vicino il parenchima linfoide. Dettaglio e
+  ipotesi in E3b.
+- Il vendor registrato (`philips`) e la risoluzione (0,243 µm/px) sono identici per tutti i vetrini
+  Radboud: nessuna differenza di scanner tra sviluppo e test.
+
+**Conclusioni.**
+
+1. **Per il vector DB:** il riferimento per l'OOD non deve essere filtrato da un indice comune.
+   Con il filtro, proprio le tile OOD restano senza risposta e sono le più lente: la ricerca filtrata
+   fallisce nel caso per cui esiste. Un indice dedicato al riferimento è piccolo, veloce e quasi
+   esatto. Il sottoinsieme k-center N = 256 è equivalente al riferimento completo su ogni misura di
+   questo esperimento con 35 volte meno vettori (38 MB: entra in memoria, non serve un indice
+   approssimato). Questo non è l'esito del criterio, che fallisce per un'altra causa: è la base
+   proposta per il ridisegno, da confermare con il punteggio di E3b.
+2. **Per il rinvio OOD:** la media delle distanze misura la composizione del tessuto (tumore, grasso)
+   insieme al dominio; i falsi rinvii vanno contro i casi con molto tumore. Il punteggio va rifatto
+   (E3b) prima di usarlo.
+3. L'indice HNSW da 14 GB sui 399 vetrini resta utile solo per la ricerca di casi simili, non per
+   l'OOD.
+
+
+## E3b — Un punteggio OOD che non misuri la composizione del tessuto
+
+**Perché.** In E3, con il punteggio "media delle distanze dal vicino", 10 vetrini Radboud di test su
+74 superano la soglia (atteso circa 5%), anche con il riferimento completo. Due meccanismi, visti
+dopo i risultati di E3 (quindi ipotesi che guidano questo protocollo, non conclusioni):
+
+1. Le tile tumorali sono lontane dal riferimento sempre, in calibrazione come in test (mediana
+   0,64 contro 0,43 delle tile normali): il tumore è raro nel riferimento e diverso da paziente a
+   paziente. Un vetrino con molto tumore supera la soglia per la quantità di tumore (`test_021`, 87%
+   di tile tumorali).
+2. Nei vetrini rinviati senza tumore campionato, le mappe delle distanze (miniature del QC, 64×)
+   mostrano il parenchima linfoide vicino al riferimento e lontani grasso perilinfonodale,
+   connettivo lasso, capsula e vasi. Sono rinviati i vetrini con molto tessuto non linfoide
+   (`test_108`, `test_119`, `test_081`). Nessun artefatto tecnico evidente a questa risoluzione
+   (pieghe, penna, sfocatura). Eccezione: in `test_011` (linfonodi quasi sostituiti da grasso) è
+   lontano anche il bordo linfoide: è il caso più vicino a un OOD vero.
+
+In entrambi i casi il punteggio misura **di che tessuto è fatto il vetrino**, non se viene da un
+dominio diverso. Un rilevatore OOD che rinvia le macrometastasi è clinicamente sbagliato.
+
+**Domanda.** Esiste un punteggio che rinvia i vetrini di un centro mai visto ma è indipendente dalla
+quantità di tumore e di tessuto non linfoide?
+
+**Dati e ruoli.** Gli stessi di E3 (riferimento 102, calibrazione 69, valutazione 74 + 55), le
+stesse 500 tile per vetrino interrogato. **Riserva:** i vetrini di valutazione sono già stati visti
+in E3, e i candidati sono scelti conoscendo i due meccanismi sopra. Il risultato di E3b basta per
+scegliere il punteggio da sviluppare, non per adottarlo in esercizio: serve una conferma su vetrini
+mai usati (CAMELYON17) con il protocollo che risulterà da qui.
+
+**Candidati** (fissati ora; tile score d = distanza euclidea dal vicino più prossimo, embedding L2):
+
+- S0, media di d sulle tile (E3, confronto).
+- S1, mediana di d.
+- S2, 25° percentile di d: "quanto è familiare il quarto più familiare del vetrino". Un cambio di
+  dominio sposta tutto il vetrino; tumore e grasso ne occupano di solito una parte.
+- S3, distanza relativa alla densità locale: per ogni tile, d(q, v) / ρ(v), dove v è il vicino più
+  prossimo nel riferimento e ρ(v) è la distanza di v dal suo vicino più prossimo in **altri** vetrini
+  del riferimento. Il tessuto che è disperso anche nel riferimento (tumore, grasso) ha ρ grande, quindi
+  conta meno. Vetrino = media sulle tile.
+
+Ogni candidato si calcola con due riferimenti: k-center 256 per vetrino (il ridisegno proposto da
+E3; ρ calcolata dentro il sottoinsieme) e, come confronto, tutte le tile. Soglia conformal come in
+E3 (α 0,05, il 67° punteggio di calibrazione su 69, rinvio se maggiore).
+
+**Esiti.**
+
+- Falsi rinvii sui 74 vetrini Radboud di test: complessivi, sui 50 normali e sui 24 tumorali.
+- Rilevamento dei 55 vetrini Utrecht di test e AUROC a livello di vetrino.
+- Dipendenza dalla composizione, sui vetrini Radboud di test: correlazione di Spearman tra il
+  punteggio e la frazione di tile tumorali (vetrini tumorali), e tra il punteggio e la frazione di
+  tile con poco tessuto (`tissue_frac` < 0,8, approssimazione del tessuto lasso e del grasso).
+
+**Criterio** (fissato ora, sul riferimento k-center 256). Un candidato è accettabile se:
+falsi rinvii complessivi tra 0,02 e 0,08; falsi rinvii sui vetrini tumorali al massimo 2 su 24;
+rilevamento di Utrecht almeno 0,95; AUROC almeno 0,98. Se più candidati sono accettabili si sceglie
+il primo nell'ordine S1, S2, S3 (dal più semplice). Se nessuno lo è, il rinvio OOD a livello di
+vetrino con un punteggio unico non viene adottato e il passo successivo è un rinvio per regione (le
+regioni lontane si mostrano al patologo, il vetrino non viene rinviato in blocco).
+
+**Limiti.** Utrecht è un OOD facile (E2): il rilevamento sarà alto per tutti; il protocollo misura
+soprattutto i falsi rinvii. Il quarto più familiare (S2) può nascondere un problema locale
+(artefatto su una parte del vetrino): quello resta compito del QC (GrandQC), non dell'OOD.
 
 **Risultati.** —
