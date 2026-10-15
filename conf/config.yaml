@@ -28,6 +28,9 @@ embed:
 
 vectordb:
   dsn: ${oc.env:TD_PG_DSN,postgresql://td:td_dev@localhost:5433/tumordetector}
+  rebuild: false                 # drop and reload the collection's table (needed after a schema change)
+  maintenance_work_mem: 4GB      # HNSW build: the graph should fit, and stay below the container's shm_size
+  index_workers: 7
 
 mlflow:
   tracking_uri: sqlite:///mlflow.db

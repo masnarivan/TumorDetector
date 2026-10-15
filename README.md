@@ -101,8 +101,20 @@ non si mescolano mai: una cartella e una tabella per (backbone, versione).
 
 ## Estrazione su Colab
 
-`td task=stream` scarica un vetrino alla volta, lo elabora e lo cancella, saltando quelli già fatti.
+`td task=stream` scarica un vetrino alla volta, lo elabora e lo cancella, saltando quelli già fatti
+e quelli già respinti dal QC con le stesse soglie.
 Il notebook `notebooks/extract_colab.ipynb` lo esegue con gli embedding su Google Drive.
+
+## Vector DB
+
+`td task=index` carica in pgvector gli embedding presenti su disco (tutti quelli del manifest, anche
+se il `.tif` non c'è più). Carica solo i vetrini nuovi o cambiati, riconosciuti dall'hash degli
+embedding; in un caricamento in blocco l'indice HNSW viene costruito una volta sola alla fine. I
+vettori sono `halfvec` (float16, come su disco). Dopo un cambio di schema la tabella va ricreata:
+
+```bash
+uv run td task=index vectordb.rebuild=true
+```
 
 ## Licenze e dipendenze
 

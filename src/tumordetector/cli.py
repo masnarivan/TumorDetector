@@ -106,7 +106,7 @@ def tile_slide(cfg: DictConfig, row, tif: Path, out: Path) -> dict:
         **qc.to_dict(), "file_md5": row.file_md5, "level0_px": list(slide.dimensions),
         "vendor": slide.properties.get(openslide.PROPERTY_NAME_VENDOR),
         "objective_power": slide.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER),
-        "tiling": OmegaConf.to_container(cfg.tiling)})
+        "tiling": OmegaConf.to_container(cfg.tiling), "qc": OmegaConf.to_container(cfg.qc)})
     print(f"{sid}: {qc.n_tiles} tiles, {qc.tissue_mm2:.0f} mm2, QC {qc.status} {qc.reason}", flush=True)
     return qc.to_dict()
 
@@ -177,6 +177,15 @@ class EmbedSession:
         m = read_json(self.root / f"{row.slide_id}.json")
         return (m["file_md5"] == row.file_md5 and m["tiling"] == self.tiling
                 and (grid is None or m["tiles_sha256"] == grid))
+
+    def is_referred(self, row) -> bool:
+        """QC already referred this file with this tiling and these thresholds: no need to fetch it again."""
+        path = self.out / "qc" / f"{row.slide_id}.json"
+        if not path.exists():
+            return False
+        qc = read_json(path)
+        return (qc["status"] != "pass" and qc["file_md5"] == row.file_md5 and qc["tiling"] == self.tiling
+                and qc.get("qc") == OmegaConf.to_container(self.cfg.qc))
 
     def record(self, slide_id: str, **rec):
         rec = {"slide_id": slide_id, "status": "", "n_tiles": 0, "t_embed_s": 0.0, "error": "", **rec}
@@ -254,7 +263,10 @@ def task_stream(cfg: DictConfig):
     raw.mkdir(parents=True, exist_ok=True)
     with EmbedSession(cfg) as session:
         todo = [r for r in manifest.itertuples() if not session.is_current(r)]
-        print(f"{len(todo)} slides to process ({len(manifest) - len(todo)} already done)", flush=True)
+        referred = [r.slide_id for r in todo if session.is_referred(r)]
+        todo = [r for r in todo if r.slide_id not in referred]
+        print(f"{len(todo)} slides to process ({len(manifest) - len(todo) - len(referred)} already done, "
+              f"{len(referred)} already referred by QC)", flush=True)
 
         def fetch(row, box):
             try:
@@ -288,26 +300,43 @@ def task_stream(cfg: DictConfig):
 
 
 def task_index(cfg: DictConfig):
+    """Load the embeddings on disk into the collection's table. With `data.slides` null: every
+    manifest slide with embeddings, wherever its .tif is (task=stream deletes them)."""
     from tumordetector.embed import store
     from tumordetector.vectordb import pg
 
-    out = Path(cfg.paths.out)
+    out, db = Path(cfg.paths.out), cfg.vectordb
     root = out / "embeddings" / cfg.backbone.name
     ident = read_json(root / "collection.json")
-    conn = pg.connect(cfg.vectordb.dsn)
-    table = pg.ensure_collection(conn, ident)
-    done = set(store.list_slides(root))
-    counts = {}
-    for row in select_slides(cfg, load_manifest(cfg)).itertuples():
-        if row.slide_id not in done:
-            print(f"{row.slide_id}: no embeddings (referred or failed), not indexed")
-            continue
+    done, manifest = set(store.list_slides(root)), load_manifest(cfg)
+    if cfg.data.slides is None:
+        rows = manifest[manifest.slide_id.isin(done)]
+        print(f"{len(rows)} slides with embeddings, {len(manifest) - len(rows)} manifest slides without "
+              "(referred by QC, failed or not extracted yet)")
+    else:
+        rows = select_slides(cfg, manifest)
+        for sid in sorted(set(rows.slide_id) - done):
+            print(f"{sid}: no embeddings (referred or failed), not indexed")
+        rows = rows[rows.slide_id.isin(done)]
+    conn = pg.connect(db.dsn)
+    table = pg.ensure_collection(conn, ident, rebuild=db.rebuild)
+    loaded = pg.indexed(conn, table)
+    todo = [r for r in rows.itertuples()
+            if loaded.get(r.slide_id) != read_json(root / f"{r.slide_id}.json")["embedding_sha256"]]
+    print(f"{len(todo)} slides to load, {len(rows) - len(todo)} already in {table}", flush=True)
+    if len(todo) > len(loaded):   # bulk load: building the index once at the end is far faster
+        pg.drop_index(conn, table)
+    for row in todo:
         emb = store.read_slide(root, row.slide_id)
-        counts[row.slide_id] = pg.upsert_slide(conn, table, row.slide_id, emb.features, emb.tiles, row.center)
-        print(f"{row.slide_id}: {counts[row.slide_id]} vectors -> {table}", flush=True)
+        n = pg.upsert_slide(conn, table, row.slide_id, emb.features, emb.tiles, row.center,
+                            emb.meta["embedding_sha256"])
+        print(f"{row.slide_id}: {n} vectors -> {table}", flush=True)
+    t0 = time.time()
+    if pg.build_index(conn, table, db.maintenance_work_mem, db.index_workers):
+        print(f"HNSW index built in {time.time() - t0:.0f} s", flush=True)
     (out / "index").mkdir(parents=True, exist_ok=True)
     write_json(out / "index" / f"{cfg.backbone.name}.json",
-               {**ident, "table": table, "slides": counts, "rows_in_table": pg.count(conn, table)})
+               {**ident, "table": table, "slides": pg.indexed(conn, table), "rows_in_table": pg.count(conn, table)})
 
 
 def splits_path(cfg: DictConfig) -> Path:

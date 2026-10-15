@@ -4,6 +4,7 @@
 services:
   db:
     image: pgvector/pgvector:pg17
+    shm_size: 6gb                 # parallel HNSW builds keep the graph in shared memory (maintenance_work_mem)
     environment:
       POSTGRES_USER: td
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-td_dev}

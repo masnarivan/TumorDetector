@@ -175,6 +175,28 @@ def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manife
     assert len(pd.read_csv(root / "extract_log.csv")) == 0
 
 
+def test_cli_stream_does_not_fetch_a_referred_slide_again(tmp_path, slide_path, manifest, monkeypatch):
+    manifest.assign(file_md5=md5sum(slide_path), label=0, has_xml=False).to_csv(tmp_path / "manifest.csv", index=False)
+    fetched = []
+
+    def fake_download(cfg, row, raw):
+        fetched.append(row.slide_id)
+        shutil.copy(slide_path, raw / f"{row.slide_id}.tif")
+        return raw / f"{row.slide_id}.tif", True
+
+    monkeypatch.setattr(cli, "download", fake_download)
+    monkeypatch.chdir(tmp_path)
+    args = ["task=stream", "backbone=dummy", f"data.manifest={tmp_path / 'manifest.csv'}",
+            f"data.raw_dir={tmp_path / 'raw'}", "data.slides=null", f"paths.out={tmp_path / 'out'}",
+            "embed.device=cpu", f"mlflow.tracking_uri=sqlite:///{tmp_path / 'mlflow.db'}"]
+    cli.main([*args, "qc.min_tissue_mm2=1000"])            # referred
+    cli.main([*args, "qc.min_tissue_mm2=1000"])            # same verdict on record: not fetched again
+    assert fetched == ["synthetic"]
+    cli.main([*args, "qc.min_tissue_mm2=0.5"])             # thresholds changed: the verdict is redone
+    assert fetched == ["synthetic", "synthetic"]
+    assert store.list_slides(tmp_path / "out/embeddings/dummy") == ["synthetic"]
+
+
 def test_vectordb_upsert_is_idempotent_and_search_finds_itself(tiled):
     psycopg = pytest.importorskip("psycopg")
     from tumordetector.vectordb import pg
@@ -186,16 +208,25 @@ def test_vectordb_upsert_is_idempotent_and_search_finds_itself(tiled):
     _, _, tiles = tiled
     feats = np.random.default_rng(0).normal(size=(len(tiles), 32)).astype(np.float32)
     ident = {"collection": "pytest__tmp", "backbone": "pytest", "version": "tmp", "dim": 32}
-    table = pg.ensure_collection(conn, ident)
+    table = pg.ensure_collection(conn, ident, rebuild=True)
     try:
         for _ in range(2):
-            assert pg.upsert_slide(conn, table, "s1", feats, tiles.assign(label="normal"), "a") == len(tiles)
+            assert pg.upsert_slide(conn, table, "s1", feats, tiles.assign(label="normal"), "a", "h1") == len(tiles)
         pg.upsert_slide(conn, table, "s2", feats + 0.01, tiles, None)
         assert pg.count(conn, table) == 2 * len(tiles)
         hit = pg.search(conn, table, feats[7], k=1)
         assert (hit.slide_id[0], hit.tile_idx[0], hit.label[0]) == ("s1", 7, "normal")
         assert hit.distance[0] == pytest.approx(0, abs=1e-6)
         assert set(pg.search(conn, table, feats[7], k=3, exclude_slide="s1").slide_id) == {"s2"}
+        assert pg.indexed(conn, table) == {"s1": "h1", "s2": None}
+        assert pg.build_index(conn, table, "64MB", 0) and not pg.build_index(conn, table, "64MB", 0)
+        assert pg.search(conn, table, feats[7], k=1).tile_idx[0] == 7     # through the index
+        # every one of the index's candidates is from s1: the exclusion must not empty the result
+        assert len(pg.search(conn, table, feats[7], k=3, exclude_slide="s1")) == 3
+        with pytest.raises(RuntimeError, match="rebuild"):                # same collection, other schema
+            pg.ensure_collection(conn, {**ident, "dim": 16})
+        pg.ensure_collection(conn, ident, rebuild=True)
+        assert pg.indexed(conn, table) == {}                              # the registry follows the table
     finally:
         conn.execute(f"DROP TABLE {table}")
         conn.execute("DELETE FROM collections WHERE name = 'pytest__tmp'")
