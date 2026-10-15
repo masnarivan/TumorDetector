@@ -1,0 +1,19 @@
+{
+ "backbone": "phikon",
+ "collection": "phikon__057cc0295895",
+ "code_version": "b17aef943bd974691dcb38eec721548bf66435eb+dirty",
+ "n_slides": 399,
+ "n_query_tiles_per_slide": 200,
+ "seed": 0,
+ "identical_md5_files": [],
+ "n_suspect_pairs": {},
+ "r_min_quantiles": {
+  "0": 1.077930212020874,
+  "0.001": 1.142571210861206,
+  "0.01": 1.1941624879837036,
+  "0.05": 1.263064980506897,
+  "0.5": 1.9507743120193481
+ },
+ "d_self_median": 0.3792739808559418,
+ "search_seconds": 252
+}

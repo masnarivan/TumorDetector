@@ -1,0 +1,10 @@
+{
+ "slide_id": "tumor_031",
+ "n_tiles": 3773,
+ "d_self": 0.35773783922195435,
+ "d_self_shifted": 0.3671010136604309,
+ "r_original_to_shifted": 0.9914065591497281,
+ "r_shifted_to_original": 0.9454164382044747,
+ "nearest_other_slide": "tumor_014",
+ "r_nearest_other_slide": 1.1856565475463867
+}

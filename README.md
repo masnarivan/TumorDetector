@@ -88,6 +88,9 @@ assegnato dal codice. Sotto `gate.min_slides` vetrini l'esito è "dati insuffici
 solo a verificare che il codice funzioni. Il report elenca anche le voci della batteria del piano
 non ancora coperte.
 
+Gli esperimenti sugli embedding, con protocollo fissato prima dei risultati, sono in
+[docs/esperimenti.md](docs/esperimenti.md).
+
 ## Backbone
 
 | Nome | Uso | Note |
