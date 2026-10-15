@@ -7,12 +7,15 @@
 """
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
-from tumordetector.backbones.base import Backbone
 from tumordetector.io import array_sha256, atomic_write, read_json, write_json
+
+if TYPE_CHECKING:  # annotation only: index and train read the store without the backbone code
+    from tumordetector.backbones.base import Backbone
 
 
 @dataclass
@@ -26,7 +29,7 @@ def collection_name(name: str, version: str) -> str:
     return f"{name}__{version[:12]}"
 
 
-def open_collection(root: Path, backbone: Backbone) -> dict:
+def open_collection(root: Path, backbone: "Backbone") -> dict:
     """Create the folder's identity file, or refuse to write into another version's folder."""
     root.mkdir(parents=True, exist_ok=True)
     ident = {"backbone": backbone.name, "version": backbone.version, "dim": backbone.dim,

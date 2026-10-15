@@ -1,30 +1,191 @@
 schema: '2.0'
 stages:
-  tile_qc:
-    cmd: td task=tile
+  index:
+    cmd: td task=index backbone=phikon
     deps:
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: 2a019ce647034be8a47f53ebe084a8bf.dir
+      size: 6711132866
+      nfiles: 1198
     - path: data/manifests/camelyon16.csv
       hash: md5
       md5: 6008cc982ba65250a15dc8747bca8d52
       size: 85273
-    - path: src/tumordetector/cli.py
+    - path: src/tumordetector/embed/store.py
       hash: md5
-      md5: 24462316bf2d9d0e879686e9e787e25a
-      size: 20582
+      md5: 0d4382b83a0ba9c7d02e68d601fc7e90
+      size: 2871
+    - path: src/tumordetector/io.py
+      hash: md5
+      md5: 03d2503f88d79f650b1e7d5d5c0e0fcd
+      size: 2953
+    - path: src/tumordetector/tasks/common.py
+      hash: md5
+      md5: 8a37131e748ec3ae8829a52b2e72a055
+      size: 1290
+    - path: src/tumordetector/tasks/index.py
+      hash: md5
+      md5: 05c1928837ee1e486b9c0632b32e135d
+      size: 2483
+    - path: src/tumordetector/vectordb/pg.py
+      hash: md5
+      md5: 1e7406f8c51dbf61a4e36302c97e7a1e
+      size: 7748
+    params:
+      conf/data/camelyon16.yaml:
+        slides: null
+    outs:
+    - path: data/index/phikon.json
+      hash: md5
+      md5: 00a1056acb2e229cb3194f55f9ba6f4a
+      size: 33361
+  baseline:
+    cmd: td task=train backbone=phikon
+    deps:
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: 2a019ce647034be8a47f53ebe084a8bf.dir
+      size: 6711132866
+      nfiles: 1198
+    - path: data/manifests/camelyon16.csv
+      hash: md5
+      md5: 6008cc982ba65250a15dc8747bca8d52
+      size: 85273
+    - path: data/manifests/camelyon16_splits.csv
+      hash: md5
+      md5: fa8e366716c596d3f739616ca82e3ac5
+      size: 4964
+    - path: src/tumordetector/embed/store.py
+      hash: md5
+      md5: 0d4382b83a0ba9c7d02e68d601fc7e90
+      size: 2871
+    - path: src/tumordetector/io.py
+      hash: md5
+      md5: 03d2503f88d79f650b1e7d5d5c0e0fcd
+      size: 2953
+    - path: src/tumordetector/mil
+      hash: md5
+      md5: ab5399089d9004f55f787bea9ff7fffc.dir
+      size: 19257
+      nfiles: 4
+    - path: src/tumordetector/tasks/common.py
+      hash: md5
+      md5: 8a37131e748ec3ae8829a52b2e72a055
+      size: 1290
+    - path: src/tumordetector/tasks/train.py
+      hash: md5
+      md5: 770ab0a082e7c87b64a48031f1b0786a
+      size: 7165
+    params:
+      conf/config.yaml:
+        gate:
+          min_slides: 100
+          min_cv_auroc: 0.9
+          min_loco_worst_auroc: 0.85
+          min_test_auroc: 0.9
+          max_ece: 0.1
+          max_loco_ece: 0.1
+          min_loco_specificity: 0.8
+        mil.device: cpu
+        mil.dropout: 0.25
+        mil.epochs: 30
+        mil.folds: 5
+        mil.hidden: 256
+        mil.lr: 0.0002
+        mil.max_tiles: 4096
+        mil.normalize: none
+        mil.seeds:
+        - 0
+        - 1
+        - 2
+        mil.threads: 1
+        mil.threshold: 0.5
+        mil.weight_decay: 0.0001
+        seed: 0
+      conf/data/camelyon16.yaml:
+        name: camelyon16
+    outs:
+    - path: data/reports/phikon/abmil/attention.csv
+      hash: md5
+      md5: f32f1170368ff83cce0ef5b0b90e2a48
+      size: 20388
+    - path: data/reports/phikon/abmil/metrics.json
+      hash: md5
+      md5: d7b48f1fd7399184dd2863eeca9b8c5a
+      size: 17231
+    - path: data/reports/phikon/abmil/model.pt
+      hash: md5
+      md5: 33ac8e5fba8592d3091d6969f59b8a42
+      size: 1055781
+    - path: data/reports/phikon/abmil/predictions.csv
+      hash: md5
+      md5: 6dc1df29f1266c33795b1951077426b3
+      size: 117868
+    - path: data/reports/phikon/abmil/report.md
+      hash: md5
+      md5: 2f7e98c158f58a85eb6e84407f17c0c2
+      size: 5719
+  stream:
+    cmd: td task=stream backbone=phikon
+    deps:
+    - path: conf/backbone/phikon.yaml
+      hash: md5
+      md5: c0a0d3293958e45397e5ee1576492a0d
+      size: 333
+    - path: data/manifests/camelyon16.csv
+      hash: md5
+      md5: 6008cc982ba65250a15dc8747bca8d52
+      size: 85273
+    - path: src/tumordetector/backbones
+      hash: md5
+      md5: e5d7c184bce1d960909ea21985ad50b2.dir
+      size: 4720
+      nfiles: 3
+    - path: src/tumordetector/data/camelyon16.py
+      hash: md5
+      md5: f81797c30bbf27491f39d5ea53b09eae
+      size: 5175
     - path: src/tumordetector/data/camelyon_annotations.py
       hash: md5
       md5: 8972023c8bd9d29b4949424dfe2c3151
       size: 2573
+    - path: src/tumordetector/embed
+      hash: md5
+      md5: 2d9763124ad983731e70e5d8908252da.dir
+      size: 7104
+      nfiles: 3
+    - path: src/tumordetector/io.py
+      hash: md5
+      md5: 03d2503f88d79f650b1e7d5d5c0e0fcd
+      size: 2953
     - path: src/tumordetector/qc/tissue.py
       hash: md5
       md5: dda6f5c020b388072fe6443e3386061f
       size: 3485
+    - path: src/tumordetector/tasks/common.py
+      hash: md5
+      md5: 8a37131e748ec3ae8829a52b2e72a055
+      size: 1290
+    - path: src/tumordetector/tasks/embed.py
+      hash: md5
+      md5: 4e211f5c6d95af7e4dadc7e7c0b8f5ed
+      size: 6185
+    - path: src/tumordetector/tasks/stream.py
+      hash: md5
+      md5: 4dce4d36b1e05459f53d0e7fb320158f
+      size: 3505
+    - path: src/tumordetector/tasks/tile.py
+      hash: md5
+      md5: cc4cdaf9826a379bc935a17bced13cf8
+      size: 3564
     - path: src/tumordetector/wsi/tiling.py
       hash: md5
       md5: 2e97cf314fec09dd354e1c1badf42024
       size: 3177
     params:
       conf/config.yaml:
+        embed.dtype: float16
         qc:
           min_tiles: 50
           min_tissue_mm2: 1.0
@@ -35,131 +196,21 @@ stages:
           mask_downsample: 64
           mask_margin: 0.03
       conf/data/camelyon16.yaml:
-        slides:
+        name: camelyon16
+        slides: null
     outs:
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: 2a019ce647034be8a47f53ebe084a8bf.dir
+      size: 6711132866
+      nfiles: 1198
     - path: data/qc
       hash: md5
-      md5: f2577dd603cabd56c7088af5a34e9833.dir
-      size: 62143185
-      nfiles: 31
+      md5: 84b389cb74a3833e19f82f179ed6bfb4.dir
+      size: 2495003611
+      nfiles: 1197
     - path: data/tiles
       hash: md5
-      md5: 13aee246ed75291a8b84e98c711bf319.dir
-      size: 165139
-      nfiles: 10
-  embed:
-    cmd: td task=embed backbone=phikon
-    deps:
-    - path: conf/backbone/phikon.yaml
-      hash: md5
-      md5: c0a0d3293958e45397e5ee1576492a0d
-      size: 333
-    - path: data/qc
-      hash: md5
-      md5: f2577dd603cabd56c7088af5a34e9833.dir
-      size: 62143185
-      nfiles: 31
-    - path: data/tiles
-      hash: md5
-      md5: 13aee246ed75291a8b84e98c711bf319.dir
-      size: 165139
-      nfiles: 10
-    - path: src/tumordetector/backbones
-      hash: md5
-      md5: d74ad1827a6d360c7bce78a10191657a.dir
-      size: 8854
-      nfiles: 5
-    - path: src/tumordetector/cli.py
-      hash: md5
-      md5: 24462316bf2d9d0e879686e9e787e25a
-      size: 20582
-    - path: src/tumordetector/embed
-      hash: md5
-      md5: b6daa31e6eb0e0fe88505a7c85740ed2.dir
-      size: 11991
-      nfiles: 5
-    params:
-      conf/config.yaml:
-        embed.dtype: float16
-    outs:
-    - path: data/embeddings/phikon
-      hash: md5
-      md5: ef294b1a09515ce3571c84fc641b4062.dir
-      size: 152459528
-      nfiles: 32
-  index:
-    cmd: td task=index backbone=phikon
-    deps:
-    - path: data/embeddings/phikon
-      hash: md5
-      md5: ef294b1a09515ce3571c84fc641b4062.dir
-      size: 152459528
-      nfiles: 32
-    - path: src/tumordetector/vectordb/pg.py
-      hash: md5
-      md5: bd71588dcd359ab6dfab3a0b7d2db675
-      size: 4357
-    outs:
-    - path: data/index/phikon.json
-      hash: md5
-      md5: b0795b764ab7368aefaa088e83b94645
-      size: 432
-  baseline:
-    cmd: td task=train backbone=phikon
-    deps:
-    - path: data/embeddings/phikon
-      hash: md5
-      md5: ef294b1a09515ce3571c84fc641b4062.dir
-      size: 152459528
-      nfiles: 32
-    - path: data/manifests/camelyon16_splits.csv
-      hash: md5
-      md5: fa8e366716c596d3f739616ca82e3ac5
-      size: 4964
-    - path: src/tumordetector/mil
-      hash: md5
-      md5: 0a1534460539df00a0ba25fa8406f3d6.dir
-      size: 15027
-      nfiles: 4
-    params:
-      conf/config.yaml:
-        gate:
-          min_slides: 100
-          min_cv_auroc: 0.9
-          min_loco_worst_auroc: 0.85
-          min_test_auroc: 0.9
-          max_ece: 0.1
-        mil:
-          hidden: 256
-          dropout: 0.25
-          lr: 0.0002
-          weight_decay: 0.0001
-          epochs: 30
-          max_tiles: 4096
-          threshold: 0.5
-          folds: 5
-          device: cpu
-          experiment: baseline-abmil
-          overwrite_splits: false
-        seed: 0
-    outs:
-    - path: data/reports/phikon/abmil/attention.csv
-      hash: md5
-      md5: 8ff1b9d5c4e37282781ad4d333916b59
-      size: 296
-    - path: data/reports/phikon/abmil/metrics.json
-      hash: md5
-      md5: 28fbe720ec10d78ffdfabc29678f8551
-      size: 1451
-    - path: data/reports/phikon/abmil/model.pt
-      hash: md5
-      md5: 8006bc566fcaca75f71ce154afaf12f9
-      size: 1055781
-    - path: data/reports/phikon/abmil/predictions.csv
-      hash: md5
-      md5: 94bd36861487123e76b882431fb48f8d
-      size: 1152
-    - path: data/reports/phikon/abmil/report.md
-      hash: md5
-      md5: bf096383e10f9b4a88b148a8a76c3266
-      size: 2971
+      md5: f9455c2c9c5064a463a54f78e7331786.dir
+      size: 6806007
+      nfiles: 399

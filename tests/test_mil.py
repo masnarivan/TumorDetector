@@ -7,6 +7,7 @@ from omegaconf import OmegaConf
 
 from tumordetector import cli
 from tumordetector.embed import store
+from tumordetector.io import read_json, write_json
 from tumordetector.mil.abmil import ABMIL
 from tumordetector.mil.evaluate import binary_metrics, ece, gate, make_cv_folds, run_protocol
 
@@ -143,7 +144,7 @@ def test_cli_train_writes_report_and_registers_a_candidate(tmp_path, monkeypatch
     root = tmp_path / "out/embeddings/dummy"
     root.mkdir(parents=True)
     ident = {"backbone": "dummy", "version": "seed0", "dim": DIM, "collection": "dummy__seed0"}
-    cli.write_json(root / "collection.json", ident)
+    write_json(root / "collection.json", ident)
     for sid, x in bags.items():
         store.write_slide(root, sid, x, pd.DataFrame({"label": labels[sid]}), ident)
 
@@ -160,7 +161,7 @@ def test_cli_train_writes_report_and_registers_a_candidate(tmp_path, monkeypatch
     rep = tmp_path / "out/reports/dummy/abmil"
     text = (rep / "report.md").read_text()
     assert "DATI INSUFFICIENTI" in text and "dummy__seed0" in text and "media su 2 semi" in text
-    metrics = cli.read_json(rep / "metrics.json")
+    metrics = read_json(rep / "metrics.json")
     assert metrics["gate"]["status"] == "insufficient_data" and metrics["seeds"] == [0, 1]
     assert len(metrics["spread"]["test/auroc"]["values"]) == 2
     assert set(pd.read_csv(rep / "predictions.csv").seed) == {0, 1}

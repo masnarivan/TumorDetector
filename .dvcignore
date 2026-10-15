@@ -1,3 +1,11 @@
 # Add patterns of files dvc should ignore, which could improve
 # the performance. Learn more at
 # https://dvc.org/doc/user-guide/dvcignore
+
+# Bytecode: rewritten by every Python run and version, it would make every stage look changed.
+__pycache__/
+*.pyc
+
+# The stream's run log (also in MLflow): rewritten by every run, even one that changes nothing, so as
+# part of data/embeddings/<backbone> it would make index and baseline rerun for no reason.
+data/embeddings/*/extract_log.csv

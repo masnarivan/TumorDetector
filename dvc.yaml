@@ -1,49 +1,71 @@
 # Reproducible pipeline: `dvc repro` reruns only the stages whose code, config or inputs changed.
-# Manifest and splits are not stages: they are rebuilt on purpose (`td task=manifest`, `td task=splits`)
-# and versioned in git.
+# Each stage depends on exactly the code it runs and the config it reads (checked by tests/test_dvc.py).
+#
+#   stream  -> data/tiles, data/qc, data/embeddings/<backbone>   the whole manifest, slide by slide
+#   index   -> PostgreSQL + data/index/<backbone>.json
+#   baseline-> data/reports/<backbone>/abmil
+#
+# Not stages:
+#   - manifest and splits (`td task=manifest`, `td task=splits`): rebuilt on purpose, versioned in git;
+#   - `td task=tile` and `td task=embed`: development on the few slides on this machine. They need the
+#     .tif, which `stream` deletes, so as stages they could not rebuild what they would overwrite.
+#     They write into the same folders as `stream`, with the same rules: run `td task=verify` before
+#     `dvc commit` if you used them.
+#
+# `stream` outputs are persistent: DVC never deletes them before a run, and the stream itself redoes
+# only the slides whose file, tiling, QC thresholds or tile grid changed (rebuilding all of them means
+# downloading ~700 GB again). A change to the tiling or embedding *code* reruns the stage, but the
+# stream does not recompute slides that are current by those criteria: if the change should alter the
+# outputs, delete them first.
 vars:
   - backbone: phikon          # switch to h_optimus_0 once the weights are available
 
 stages:
-  tile_qc:
-    cmd: td task=tile
+  stream:
+    cmd: td task=stream backbone=${backbone}
     deps:
       - data/manifests/camelyon16.csv
-      - src/tumordetector/cli.py
-      - src/tumordetector/wsi/tiling.py
-      - src/tumordetector/qc/tissue.py
-      - src/tumordetector/data/camelyon_annotations.py
-    params:
-      - conf/config.yaml:
-          - tiling
-          - qc
-      - conf/data/camelyon16.yaml:
-          - slides
-    outs:
-      - data/tiles
-      - data/qc
-
-  embed:
-    cmd: td task=embed backbone=${backbone}
-    deps:
-      - data/tiles
-      - data/qc
       - conf/backbone/${backbone}.yaml
-      - src/tumordetector/cli.py
+      - src/tumordetector/tasks/stream.py
+      - src/tumordetector/tasks/tile.py
+      - src/tumordetector/tasks/embed.py
+      - src/tumordetector/tasks/common.py
+      - src/tumordetector/io.py
+      - src/tumordetector/data/camelyon16.py
+      - src/tumordetector/data/camelyon_annotations.py
+      - src/tumordetector/qc/tissue.py
+      - src/tumordetector/wsi/tiling.py
       - src/tumordetector/embed
       - src/tumordetector/backbones
     params:
       - conf/config.yaml:
+          - tiling
+          - qc
           - embed.dtype
+      - conf/data/camelyon16.yaml:
+          - name
+          - slides
     outs:
+      - data/tiles:
+          persist: true
+      - data/qc:
+          persist: true
       - data/embeddings/${backbone}:
-          persist: true       # resumable: a slide is re-embedded only if its file or tile grid changed
+          persist: true
 
   index:
     cmd: td task=index backbone=${backbone}
     deps:
       - data/embeddings/${backbone}
+      - data/manifests/camelyon16.csv
+      - src/tumordetector/tasks/index.py
+      - src/tumordetector/tasks/common.py
+      - src/tumordetector/io.py
+      - src/tumordetector/embed/store.py
       - src/tumordetector/vectordb/pg.py
+    params:
+      - conf/data/camelyon16.yaml:
+          - slides
     outs:
       - data/index/${backbone}.json:
           cache: false
@@ -52,13 +74,31 @@ stages:
     cmd: td task=train backbone=${backbone}
     deps:
       - data/embeddings/${backbone}
+      - data/manifests/camelyon16.csv
       - data/manifests/camelyon16_splits.csv
+      - src/tumordetector/tasks/train.py
+      - src/tumordetector/tasks/common.py
+      - src/tumordetector/io.py
+      - src/tumordetector/embed/store.py
       - src/tumordetector/mil
     params:
       - conf/config.yaml:
           - seed
-          - mil
           - gate
+          - mil.hidden
+          - mil.dropout
+          - mil.lr
+          - mil.weight_decay
+          - mil.epochs
+          - mil.max_tiles
+          - mil.threshold
+          - mil.folds
+          - mil.device
+          - mil.seeds
+          - mil.threads
+          - mil.normalize
+      - conf/data/camelyon16.yaml:
+          - name
     outs:
       - data/reports/${backbone}/abmil/model.pt
       - data/reports/${backbone}/abmil/predictions.csv

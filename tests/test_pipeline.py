@@ -15,6 +15,7 @@ from tumordetector.embed import store
 from tumordetector.embed.extract import TileDataset, extract
 from tumordetector.io import md5sum
 from tumordetector.qc.tissue import assess, compute_tissue_mask
+from tumordetector.tasks import stream
 from tumordetector.wsi.tiling import make_tile_grid, read_tile, slide_mpp
 
 DUMMY = OmegaConf.create({"name": "dummy", "input_px": 224, "mpp": 0.5, "dim": 32, "seed": 0})
@@ -160,7 +161,7 @@ def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manife
             shutil.copy(slide_path, tif)
         return tif, fresh
 
-    monkeypatch.setattr(cli, "download", fake_download)
+    monkeypatch.setattr(stream, "download", fake_download)
     monkeypatch.chdir(tmp_path)
     args = ["task=stream", "backbone=dummy", f"data.manifest={tmp_path / 'manifest.csv'}", f"data.raw_dir={raw}",
             "data.slides=null", f"paths.out={tmp_path / 'out'}", "embed.device=cpu", "qc.min_tissue_mm2=0.5",
@@ -184,7 +185,7 @@ def test_cli_stream_does_not_fetch_a_referred_slide_again(tmp_path, slide_path, 
         shutil.copy(slide_path, raw / f"{row.slide_id}.tif")
         return raw / f"{row.slide_id}.tif", True
 
-    monkeypatch.setattr(cli, "download", fake_download)
+    monkeypatch.setattr(stream, "download", fake_download)
     monkeypatch.chdir(tmp_path)
     args = ["task=stream", "backbone=dummy", f"data.manifest={tmp_path / 'manifest.csv'}",
             f"data.raw_dir={tmp_path / 'raw'}", "data.slides=null", f"paths.out={tmp_path / 'out'}",

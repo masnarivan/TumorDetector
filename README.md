@@ -19,13 +19,15 @@ Questo repository è alla fase F0: lo scheletro riproducibile su cui si innestan
 ## Pipeline
 
 ```
-manifest ──> tile_qc ──> embed ──┬──> index      PostgreSQL + pgvector
-  (git)      data/tiles  data/embeddings/<backbone>
-             data/qc             └──> baseline   data/reports/<backbone>/abmil
-splits (git) ─────────────────────────┘
+manifest ──> stream ──────────────────────┬──> index      PostgreSQL + pgvector
+  (git)      data/tiles, data/qc,         │
+             data/embeddings/<backbone>   └──> baseline   data/reports/<backbone>/abmil
+splits (git) ─────────────────────────────────┘
 ```
 
-Ogni stadio è `td task=<nome>`, configurato da Hydra (`conf/`) e orchestrato da DVC (`dvc.yaml`).
+Ogni stadio è `td task=<nome>` (un modulo in `tumordetector/tasks/`), configurato da Hydra (`conf/`)
+e orchestrato da DVC (`dvc.yaml`). Ogni stadio dipende solo dal codice che esegue e dalla
+configurazione che legge: lo controlla `tests/test_dvc.py`.
 Ogni vetrino porta con sé hash del file, versione del backbone, parametri di tiling e hash degli
 embedding (`data/embeddings/<backbone>/<vetrino>.json`); ogni estrazione è una run MLflow.
 
@@ -45,11 +47,15 @@ docker compose up -d
 uv run dvc repro
 ```
 
-`dvc repro` riesegue solo gli stadi il cui codice, configurazione o input è cambiato. I vetrini da
-elaborare sono in `conf/data/camelyon16.yaml` (`slides`); la cartella dei `.tif` è `raw_dir`, o la
-variabile `TD_RAW_DIR`.
+`dvc repro` riesegue solo gli stadi il cui codice, configurazione o input è cambiato. `stream`
+elabora tutto il manifest: scarica un vetrino alla volta e rifà solo quelli il cui file, tiling,
+soglie di QC o griglia di tile sono cambiati. I suoi output sono `persist`, quindi DVC non li
+cancella mai prima di rieseguirlo (ricostruirli vorrebbe dire riscaricare ~700 GB). Se cambia il
+*codice* di tiling o di embedding, DVC riesegue lo stadio, ma lo stream non ricalcola i vetrini già
+aggiornati secondo quei criteri: se la modifica deve cambiare gli output, vanno cancellati prima.
 
-Singoli stadi e override:
+Per lo sviluppo sui pochi vetrini presenti in locale (`raw_dir`, o la variabile `TD_RAW_DIR`) ci
+sono `td task=tile` e `td task=embed`, fuori da DVC:
 
 ```bash
 uv run td task=tile "data.slides=[tumor_031]"
@@ -57,6 +63,13 @@ uv run td task=tile "data.slides=[tumor_031]"
 
 ```bash
 uv run td task=embed backbone=dummy embed.device=cpu
+```
+
+Scrivono nelle stesse cartelle di `stream`: dopo averli usati, prima di `dvc commit`, controlla che
+gli output corrispondano alla provenienza registrata per ogni vetrino:
+
+```bash
+uv run td task=verify backbone=phikon
 ```
 
 Esperimenti:
