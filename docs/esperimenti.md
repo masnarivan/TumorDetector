@@ -11,6 +11,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E3 | OOD con DB completo, sottoinsieme k-center e regioni | fatto: k-center basta, il punteggio no | il ridisegno del vector DB |
 | E3b | Punteggio OOD indipendente dalla composizione del tessuto | protocollo scritto | come rinviare un vetrino OOD |
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
+| E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -451,3 +452,51 @@ soprattutto i falsi rinvii. Il quarto più familiare (S2) può nascondere un pro
 (artefatto su una parte del vetrino): quello resta compito del QC (GrandQC), non dell'OOD.
 
 **Risultati.** —
+
+## E5 — Compressione dei vettori nel vector DB
+
+Misura esplorativa del 16/10/2026, fatta dopo il caricamento su Qdrant (commit 589d77f) e senza un
+protocollo fissato prima: serve a orientare una decisione futura, non a validarla.
+Codice: `experiments/e5_compression.py`.
+
+**Domanda.** Se il cluster Qdrant si riempie, quanto si perde rimpicciolendo i vettori?
+
+**Stato del cluster al 16/10/2026** (piano gratuito: 3,9 GB di disco, 1,1 GB di RAM). Con 404
+vetrini (399 CAMELYON16 + 5 CAMELYON17), 185k punti: ~285 MB di vettori (float16, su disco),
+~71 MB di payload, qualche decina di MB di grafo HNSW (in RAM). In tutto ~0,4 GB di disco, ~120 MB
+di RAM residente. Circa 0,9 MB per vetrino: c'è posto per altri ~3.500 vetrini (tutto CAMELYON17
+porta il totale a ~0,85 GB).
+
+**Misura.** I 102k prototipi k-center (256 per vetrino) dei 399 vetrini CAMELYON16, Phikon; 1.000
+tile di query (10 da un vetrino ogni 4), cercate tra i prototipi degli altri vetrini. Riferimento:
+ricerca esatta a 768 dimensioni. La PCA è stimata su 50k prototipi normalizzati, con distanza
+euclidea (centrare cambia il coseno, non la distanza euclidea). int8: quantizzazione per dimensione
+su 256 livelli, come quella scalare di Qdrant.
+
+| Formato | Byte per vettore | Varianza tenuta | Recall@10 | Top-1 | Spearman distanza dal più vicino |
+|---|---|---|---|---|---|
+| float16, 768 (attuale) | 1536 | 1 | 1,000 | 1,000 | 1,000 |
+| int8, 768 | 768 | — | 0,993 | 0,995 | 1,000 |
+| PCA 384, float16 | 768 | 0,966 | 0,953 | 0,936 | 0,998 |
+| PCA 384, int8 | 384 | 0,966 | 0,952 | 0,932 | 0,998 |
+| PCA 256, float16 | 512 | 0,932 | 0,912 | 0,875 | 0,992 |
+| PCA 128, float16 | 256 | 0,857 | 0,821 | 0,756 | 0,963 |
+| PCA 64, float16 | 128 | 0,761 | 0,690 | 0,572 | 0,882 |
+
+La distanza dal più vicino è quella del punteggio OOD (E3).
+
+**Conclusioni (consiglio per dopo).**
+
+1. Per ora non serve comprimere: il cluster è pieno al ~10%.
+2. Quando servirà spazio, prima alleggerire il payload (~20% dello spazio): per esempio l'hash
+   degli embedding ripetuto su ogni punto può stare solo in `data/index/<backbone>.json`. Non costa
+   nulla in qualità.
+3. Poi int8: metà dello spazio, vicini e distanze praticamente identici. La quantizzazione scalare
+   di Qdrant (`quantization_config`, int8 in RAM con rescoring sugli originali) risparmia RAM ma
+   non disco, perché tiene gli originali. Per risparmiare disco i vettori vanno salvati già in int8
+   da noi.
+4. La PCA è sconsigliata: a parità di byte con int8 (PCA 384 float16) perde il 5% dei vicini, e a
+   256 o meno peggio. Inoltre è stimata su CAMELYON16: rischia di scartare proprio le direzioni
+   che distinguono un centro o un tessuto nuovo, cioè quello che il punteggio OOD deve vedere.
+   Se mai la si usasse, andrebbe rivalidata sul rilevamento OOD (E3/E3b), non solo sul recall.
+5. Un'altra leva, da misurare con E3: meno prototipi per vetrino (128 invece di 256).
