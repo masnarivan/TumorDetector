@@ -81,6 +81,12 @@ uv run pytest -q && uv run ruff check && uv run scripts/check_licenses.py
 2. leave-one-center-out: conta il centro peggiore, non la media;
 3. un modello addestrato su tutto lo sviluppo e valutato una volta sullo split di test ufficiale.
 
+Il protocollo gira una volta per seme (`mil.seeds`, default 0, 1, 2, in processi paralleli) e la
+batteria legge la media: con un solo seme la variabilità è grande quanto le differenze da giudicare
+(esperimento E4). Il report riporta media, deviazione standard e valore di ogni seme; il modello
+salvato è quello del primo seme. Ogni addestramento usa `mil.threads` thread (default 1): con lo
+stesso seme e lo stesso numero di thread il modello è identico, con un numero diverso no.
+
 Il risultato è `data/reports/<backbone>/abmil/report.md` (versionato in git), allegato alla run
 MLflow insieme al modello. Nel registry ogni modello addestrato riceve l'alias `candidate`;
 `validated` solo se supera le soglie di `gate` in `conf/config.yaml`; `production` non viene mai

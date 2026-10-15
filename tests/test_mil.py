@@ -12,7 +12,8 @@ from tumordetector.mil.evaluate import binary_metrics, ece, gate, make_cv_folds,
 
 DIM = 16
 MIL = OmegaConf.create({"hidden": 32, "dropout": 0.0, "lr": 2e-3, "weight_decay": 0.0, "epochs": 12,
-                        "max_tiles": 256, "threshold": 0.5, "folds": 4, "device": "cpu", "normalize": "none"})
+                        "max_tiles": 256, "threshold": 0.5, "folds": 4, "device": "cpu", "normalize": "none",
+                        "threads": 1})
 GATE = OmegaConf.create({"min_slides": 20, "min_cv_auroc": 0.9, "min_loco_worst_auroc": 0.85,
                          "min_test_auroc": 0.9, "max_ece": 0.5})
 
@@ -87,6 +88,33 @@ def test_protocol_learns_the_planted_signal_with_slide_mean_normalisation():
     assert result["metrics"]["test"]["auroc"] > 0.95
 
 
+def test_same_seed_and_threads_give_the_same_model():
+    torch = pytest.importorskip("torch")
+    from tumordetector.mil.abmil import fit
+
+    table, bags, _ = synthetic()
+    weights = []
+    for _ in range(2):
+        model = fit([bags[s] for s in table.slide_id], table.label.to_numpy(), MIL, seed=3)
+        weights.append(model.state_dict())
+    assert all(torch.equal(weights[0][k], weights[1][k]) for k in weights[0])
+
+
+def test_across_seeds_averages_every_metric_and_keeps_the_spread():
+    from tumordetector.mil.evaluate import across_seeds
+
+    a = {"cv": {"n": 10, "auroc": 0.9, "ece": 0.1}, "loco_worst_auroc": 0.8, "test": {"auroc": 0.95},
+         "attention_auroc_mean": None}
+    b = {"cv": {"n": 10, "auroc": 0.7, "ece": 0.3}, "loco_worst_auroc": 0.9, "test": {"auroc": 0.97},
+         "attention_auroc_mean": 0.5}
+    mean, spread = across_seeds([a, b])
+    assert mean["cv"] == {"n": 10, "auroc": pytest.approx(0.8), "ece": pytest.approx(0.2)}
+    assert mean["loco_worst_auroc"] == pytest.approx(0.85)
+    assert mean["attention_auroc_mean"] is None and "attention_auroc_mean" not in spread
+    assert spread["cv/auroc"]["values"] == [0.9, 0.7] and spread["cv/auroc"]["min"] == 0.7
+    assert gate(mean, 100, GATE)["status"] == "failed"     # the mean CV AUROC 0.8 is below 0.9
+
+
 def test_protocol_reports_what_it_cannot_run():
     table, bags, labels = synthetic()
     few = table[(table.split == "train") & (table.label == 1)].head(4)   # one class, no test split
@@ -116,13 +144,15 @@ def test_cli_train_writes_report_and_registers_a_candidate(tmp_path, monkeypatch
     cli.main(["task=splits", *common])
     with pytest.raises(SystemExit, match="never regenerated implicitly"):
         cli.main(["task=splits", *common])
-    cli.main(["task=train", *common])
+    cli.main(["task=train", *common, "mil.seeds=[0,1]", "mil.workers=2"])   # seeds in worker processes
 
     rep = tmp_path / "out/reports/dummy/abmil"
     text = (rep / "report.md").read_text()
-    assert "DATI INSUFFICIENTI" in text and "dummy__seed0" in text
-    assert cli.read_json(rep / "metrics.json")["gate"]["status"] == "insufficient_data"
-    assert len(pd.read_csv(rep / "predictions.csv")) > 0
+    assert "DATI INSUFFICIENTI" in text and "dummy__seed0" in text and "media su 2 semi" in text
+    metrics = cli.read_json(rep / "metrics.json")
+    assert metrics["gate"]["status"] == "insufficient_data" and metrics["seeds"] == [0, 1]
+    assert len(metrics["spread"]["test/auroc"]["values"]) == 2
+    assert set(pd.read_csv(rep / "predictions.csv").seed) == {0, 1}
 
     client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
     version = client.get_model_version_by_alias("abmil-camelyon16-dummy", "candidate")
@@ -131,7 +161,7 @@ def test_cli_train_writes_report_and_registers_a_candidate(tmp_path, monkeypatch
         client.get_model_version_by_alias("abmil-camelyon16-dummy", "validated")
 
     # an experiment run: its own report folder, nothing added to the registry
-    cli.main(["task=train", *common, "mil.register=false", "mil.normalize=slide_mean",
+    cli.main(["task=train", *common, "mil.seeds=[0]", "mil.register=false", "mil.normalize=slide_mean",
               f"mil.report_dir={tmp_path / 'exp'}"])
     assert (tmp_path / "exp/report.md").exists() and "slide_mean" in (tmp_path / "exp/report.md").read_text()
     assert len(client.search_model_versions("name='abmil-camelyon16-dummy'")) == 1

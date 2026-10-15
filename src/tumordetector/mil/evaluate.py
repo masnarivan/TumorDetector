@@ -146,3 +146,42 @@ def gate(metrics: dict, n_slides: int, cfg) -> dict:
         elif (value < limit) if op == ">=" else (value > limit):
             reasons.append(f"{name} {value:.3f}, richiesto {op} {limit}")
     return {"status": "failed" if reasons else "passed", "reasons": reasons}
+
+
+def _leaves(d: dict, prefix: str = "") -> dict:
+    """Nested metrics -> {"loco/held-out radboud/ece": value} for every number or None."""
+    out = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            out.update(_leaves(v, f"{prefix}{k}/"))
+        elif v is None or isinstance(v, (int, float)):
+            out[prefix + k] = v
+    return out
+
+
+def _nest(flat: dict) -> dict:
+    out = {}
+    for path, v in flat.items():
+        *parents, leaf = path.split("/")
+        node = out
+        for p in parents:
+            node = node.setdefault(p, {})
+        node[leaf] = v
+    return out
+
+
+def across_seeds(per_seed: list[dict]) -> tuple[dict, dict]:
+    """Metrics of several seeds -> (mean metrics, same shape as one seed's; spread per metric path:
+    mean, sd, min, max and the value of every seed). A metric missing in any seed is None."""
+    flat = [_leaves(m) for m in per_seed]
+    mean, spread = {}, {}
+    for path in flat[0]:
+        values = [f.get(path) for f in flat]
+        if any(v is None for v in values):
+            mean[path] = None
+            continue
+        a = np.asarray(values, dtype=float)
+        mean[path] = int(a[0]) if path.endswith(("/n", "/n_pos")) else float(a.mean())
+        spread[path] = {"mean": float(a.mean()), "sd": float(a.std(ddof=1)) if len(a) > 1 else 0.0,
+                        "min": float(a.min()), "max": float(a.max()), "values": a.tolist()}
+    return _nest(mean), spread

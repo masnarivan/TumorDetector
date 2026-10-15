@@ -189,7 +189,8 @@ di almeno 0,05, l'AUROC peggiore in leave-one-centre-out non scende più di 0,02
 scende più di 0,01. Si riportano anche i valori di ogni seme.
 
 **Risultati** (codice `7712fdb+dirty`, 2026-10-15: le modifiche non committate sono quelle di questo
-esperimento; il seme cambia anche i fold di CV, mentre leave-one-centre-out e test sono fissi).
+esperimento; gli split, compresi i fold di CV, sono quelli versionati: il seme cambia solo
+inizializzazione, ordine dei vetrini e tile campionate).
 
 | Metrica | none s0 | s1 | s2 | slide_mean s0 | s1 | s2 | media none | media slide_mean | Δ |
 |---|---|---|---|---|---|---|---|---|---|
@@ -223,9 +224,17 @@ leave-one-centre-out +0,018 invece di −0,05); i due co-primari restano nei mar
 - **La variabilità tra semi è grande quanto l'effetto cercato.** Con `none` l'ECE peggiore va da 0,123
   a 0,190. Lo stesso seme 0 con la stessa configurazione del baseline registrato
   (`data/reports/phikon/abmil`) dà ECE con Utrecht escluso 0,126 invece di 0,235 e specificità di
-  Utrecht nel test 0,933 invece di 0,70: l'addestramento non è riproducibile da un'esecuzione
-  all'altra (qui con `OMP_NUM_THREADS=1`, il baseline con i thread di default). Il numero singolo del
-  baseline va quindi letto con un'incertezza di questo ordine, e il gate deve considerarla.
+  Utrecht nel test 0,933 invece di 0,70. Il numero singolo del baseline va quindi letto con
+  un'incertezza di questo ordine, e il gate deve considerarla.
+
+**Nota del 2026-10-15: causa della differenza col baseline.** È il numero di thread della CPU. Con lo
+stesso numero di thread l'addestramento si ripete identico (stessi pesi in due esecuzioni); tra 1
+thread (E4) e 6 (il baseline, default della macchina) l'ordine delle somme in virgola mobile cambia e,
+in 30 epoche, cambia il modello: sul leave-one-centre-out con Utrecht escluso la probabilità di un
+vetrino si sposta fino a 0,512, esattamente lo scarto tra baseline e `none` s0. Non dipende dal
+caricamento in memory-map. Da qui il numero di thread è un parametro (`mil.threads`, default 1) e fa
+parte del risultato. Che differenze numeriche minime spostino così un vetrino è la stessa
+instabilità che si vede tra semi: la riproducibilità esatta non toglie la necessità di più semi.
 
 **Conseguenze.** (1) Il problema di calibrazione tra centri resta aperto: le strade successive sono
 la ricalibrazione per centro (temperature scaling con pochi vetrini del nuovo centro) e il rinvio

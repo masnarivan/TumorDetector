@@ -31,13 +31,30 @@ def _metric_rows(named: dict) -> str:
     return "\n".join(lines)
 
 
+# Metrics shown seed by seed: the ones the battery reads, calibration and errors per centre.
+SPREAD = ["cv/auroc", "cv/ece", "loco_worst_auroc", "test/auroc", "test/ece", "attention_auroc_mean"]
+SPREAD_SUFFIX = ("/auroc", "/ece", "/sensitivity", "/specificity")
+
+
+def _spread_rows(spread: dict, seeds: list) -> str:
+    paths = SPREAD + [p for p in spread if p.startswith(("loco/", "test_by_center/")) and p.endswith(SPREAD_SUFFIX)]
+    head = "| Metrica | Media | DS | Min | Max | " + " | ".join(f"Seme {s}" for s in seeds) + " |"
+    lines = [head, "|" + "---|" * (5 + len(seeds))]
+    for p in paths:
+        if p in spread:
+            v = spread[p]
+            lines.append(f"| {p} | " + " | ".join(_fmt(v[k]) for k in ("mean", "sd", "min", "max"))
+                         + " | " + " | ".join(_fmt(x) for x in v["values"]) + " |")
+    return "\n".join(lines)
+
+
 def render(result: dict, verdict: dict, context: dict) -> str:
-    m = result["metrics"]
+    m, seeds = result["metrics"], result["seeds"]
     runs = pd.DataFrame(result["runs"])
     out = [
         f"# Report di validazione — {context['Modello']}",
         "",
-        f"**Esito della batteria: {VERDICT[verdict['status']]}**",
+        f"**Esito della batteria: {VERDICT[verdict['status']]}** (media su {len(seeds)} semi)",
         "",
         *[f"- {r}" for r in verdict["reasons"]],
         "",
@@ -52,6 +69,10 @@ def render(result: dict, verdict: dict, context: dict) -> str:
         f"{result['n_held_out']} test bloccato) |",
         "",
         "## Risultati",
+        "",
+        f"Ogni valore è la media su {len(seeds)} semi ({', '.join(map(str, seeds))}): stesso protocollo, "
+        "stessi split, cambiano inizializzazione, ordine dei vetrini e tile campionate. La variabilità "
+        "è nella sezione «Variabilità tra semi».",
         "",
         _metric_rows({"Cross-validation (predizioni fuori fold, aggregate)": m["cv"],
                       **{f"Leave-one-center-out, {k}": v for k, v in m["loco"].items()},
@@ -68,9 +89,13 @@ def render(result: dict, verdict: dict, context: dict) -> str:
         "",
         f"AUROC dell'attenzione nel distinguere tile tumorali da normali, media sui vetrini positivi con "
         f"annotazione completa (fuori fold): **{_fmt(m['attention_auroc_mean'])}** "
-        f"su {int((result['attention'].group == 'cv').sum())} vetrini.",
+        f"su {result['attention'][result['attention'].group == 'cv'].slide_id.nunique()} vetrini.",
         "",
-        "## Esecuzioni",
+        "## Variabilità tra semi",
+        "",
+        _spread_rows(result["spread"], seeds),
+        "",
+        f"## Esecuzioni (seme {seeds[0]})",
         "",
         "| Gruppo | Valutazione | Vetrini di training | Vetrini valutati | Stato | Motivo |",
         "|---|---|---|---|---|---|",

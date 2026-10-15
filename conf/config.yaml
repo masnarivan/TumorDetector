@@ -46,6 +46,11 @@ mil:                 # ABMIL baseline on frozen embeddings
   threshold: 0.5
   folds: 5
   device: cpu        # small model: the CPU is fast enough and deterministic
+  seeds: [0, 1, 2]   # the protocol runs once per seed, the gate reads the mean (E4: one seed
+                     # is too noisy to decide on); the model kept is the first seed's
+  workers: 3         # seeds trained in parallel processes, `threads` each
+  threads: 1         # CPU threads for training: part of the result, a different count gives a
+                     # different model (float summation order). 1 runs the same on any machine.
   normalize: none    # none | slide_mean: subtract each slide's mean tile (experiment E4)
   experiment: baseline-abmil
   report_dir: null   # null = data/reports/<backbone>/abmil; experiments write elsewhere
