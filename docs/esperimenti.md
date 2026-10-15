@@ -7,7 +7,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | # | Esperimento | Stato | Serve a decidere |
 |---|---|---|---|
 | E1 | Fughe di dati tra split: quasi-duplicati tra sviluppo e test | fatto: nessun duplicato | se l'AUROC 0.993 sul test è credibile |
-| E2 | Probe sul centro (Robustness Index) a livello tile, regione, vetrino | da fare | se e quanto mitigare l'effetto centro |
+| E2 | Probe sul centro (Robustness Index) a livello tile, regione, vetrino | fatto: centro codificato ovunque | se e quanto mitigare l'effetto centro |
 | E3 | OOD con DB completo, sottoinsieme k-center e regioni | da fare | il ridisegno del vector DB |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
@@ -71,6 +71,92 @@ vicine a 1,08. Una riscansione vera su uno scanner diverso (colore e fuoco diver
 in mezzo, e due sezioni consecutive dello stesso blocco non sarebbero riconosciute in modo
 affidabile. Per quel caso servirebbe un confronto della forma dei frammenti di tessuto (le maschere
 del QC), non degli embedding.
+
+
+## E2 — Quanto il centro è leggibile negli embedding
+
+**Domanda.** Gli embedding Phikon codificano il centro di provenienza, e quanto rispetto alla
+biologia (tumore / normale)? Lo spostamento dei punteggi visto su Utrecht nel baseline (ECE 0,235,
+specificità 0,70) è uno spostamento globale, correggibile normalizzando, o qualcosa di più?
+
+**Dati.** I 399 vetrini CAMELYON16, Phikon `057cc0295895`, embedding su disco.
+
+**Analisi.**
+
+1. *Probe sul centro.* Regressione logistica (L2, feature standardizzate) che predice il centro, a
+   tre livelli: tile (200 per vetrino, seme fisso), regione (8×8 tile, media; regioni con almeno 16
+   tile), vetrino (media delle tile). Validazione a 5 fold **raggruppati per vetrino** (altrimenti il
+   probe riconoscerebbe il vetrino, non il centro). Metriche: AUROC e accuratezza bilanciata; il caso
+   è 0,5. A livello tile e regione si riportano anche i risultati sul solo tessuto normale, per non
+   misurare differenze di composizione.
+2. *Robustness Index* (definizione di de Jong et al., 2025, da verificare sull'articolo). Tile
+   tumorali e normali dai vetrini con annotazione completa (fino a 100 per classe per vetrino). Per
+   ogni tile, i 10 vicini più prossimi (coseno, esatto) **escludendo il suo vetrino**; RI = numero di
+   vicini con stessa classe e altro centro / numero di vicini con altra classe e stesso centro.
+   RI > 1: domina la biologia; RI < 1: domina il centro.
+3. *Spostamento dei punteggi del baseline.* Dalle predizioni fuori fold e di test del baseline ABMIL:
+   distribuzione della probabilità per centro e per classe.
+4. *Normalizzazione come anteprima di mitigazione.* Si ripetono 1 e 2 sottraendo a ogni embedding
+   (a) la media del suo vetrino, (b) la media del suo centro. Per la tile si riporta anche il probe
+   tumore/normale (5 fold per vetrino), per vedere se la normalizzazione toglie anche segnale utile.
+
+**Lettura dei risultati** (fissata ora). Il centro è "fortemente codificato" se il probe sul centro
+a livello vetrino ha AUROC ≥ 0,9. La normalizzazione per vetrino diventa la prima mitigazione da
+provare nel baseline (leave-one-centre-out) se riduce l'AUROC del centro a livello tile di almeno
+0,1 e il probe tumore/normale perde meno di 0,02. La normalizzazione per centro è solo diagnostica:
+in esercizio il centro di un vetrino nuovo può non avere statistiche.
+
+**Limiti.** Due centri, un backbone. Il probe lineare misura solo informazione linearmente
+leggibile.
+
+**Risultati** (15/10/2026, codice `ff683b9` + `experiments/e2_center.py`, 183 s).
+
+Probe sul centro, AUROC (fuori fold, 5 fold per vetrino):
+
+| Livello | Embedding grezzi | − media del vetrino | − media del centro |
+|---|---|---|---|
+| Tile | 1,000 | 0,489 | 0,512 |
+| Tile, solo tessuto normale | 1,000 | 0,547 | 0,695 |
+| Regione | 1,000 | 0,590 | 0,323 |
+| Regione, solo tessuto normale | 1,000 | 0,646 | 0,819 |
+| Vetrino | 1,000 | n/d | 0,278 |
+| *Probe tumore/normale, tile* | *0,992* | *0,978* | *0,992* |
+| *Robustness Index (k = 10)* | *0,09* | *0,39* | *0,18* |
+| *Vicini dallo stesso centro* | *100%* | *99%* | *100%* |
+
+Valori sotto 0,5 con la media del centro sottratta sono un artefatto noto: sottrarre la media di un
+gruppo e poi validare per gruppi inverte la relazione. Quella colonna è solo diagnostica.
+
+Probabilità del baseline sui vetrini **normali** (mediana; 90° percentile):
+
+| Valutazione | Radboud | Utrecht |
+|---|---|---|
+| Cross-validation | 0,017; 0,37 | 0,000; 0,002 |
+| Leave-one-centre-out (centro escluso) | 0,018; 0,07 | **0,388; 0,59** |
+| Test | 0,001; 0,30 | 0,013; **0,93** |
+
+Sui vetrini tumorali di Radboud escluso, il 10° percentile scende a 0,07 (contro 0,99 in CV).
+
+**Lettura secondo i criteri fissati.**
+
+- Il centro è **fortemente codificato**: AUROC 1,000 a ogni livello, anche da una singola tile di
+  tessuto normale.
+- La normalizzazione per vetrino **soddisfa il criterio**: il probe sul centro a livello tile scende
+  da 1,000 a 0,489 (caso), il probe tumore/normale perde 0,014 (< 0,02). È la prima mitigazione da
+  provare nel baseline in leave-one-centre-out.
+
+**Osservazioni non previste dal protocollo** (da trattare come ipotesi).
+
+- Con gli embedding grezzi, i 10 vicini di una tile presi da altri vetrini sono **tutti dello stesso
+  centro** (RI 0,09). Anche dopo la normalizzazione per vetrino sono dello stesso centro nel 99% dei
+  casi, mentre il probe lineare non lo legge più: l'informazione sul centro che resta non è uno
+  spostamento della media ma sta nella struttura locale (varianza, nitidezza, colore). La
+  normalizzazione basta forse al classificatore, non alla ricerca per similarità.
+- Per E3 questo significa che Utrecht non è un OOD "lieve" nello spazio degli embedding: la
+  distanza dai vicini lo separerà facilmente. Il confronto tra configurazioni resta valido, ma
+  serviranno anche OOD più sottili.
+- Il problema del baseline è uno spostamento in blocco: con Utrecht escluso, l'intera distribuzione
+  dei normali di Utrecht sale (mediana da 0,000 a 0,388). Coerente con la mancata calibrazione.
 
 
 ## E3 — OOD: quanto si perde indicizzando un sottoinsieme

@@ -1,0 +1,13 @@
+group,center,y,count,10%,50%,90%
+cv,radboud,0,100.0,0.0,0.017,0.372
+cv,radboud,1,71.0,0.991,1.0,1.0
+cv,utrecht,0,59.0,0.0,0.0,0.002
+cv,utrecht,1,40.0,0.99,1.0,1.0
+loco,radboud,0,100.0,0.008,0.018,0.07
+loco,radboud,1,71.0,0.074,0.969,0.997
+loco,utrecht,0,59.0,0.177,0.388,0.588
+loco,utrecht,1,40.0,0.973,0.998,1.0
+test,radboud,0,50.0,0.0,0.001,0.304
+test,radboud,1,24.0,0.972,1.0,1.0
+test,utrecht,0,30.0,0.0,0.013,0.933
+test,utrecht,1,25.0,0.999,1.0,1.0

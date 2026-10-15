@@ -1,0 +1,134 @@
+{
+ "backbone": "phikon",
+ "collection": "phikon__057cc0295895",
+ "code_version": "ff683b982b6ffcf2d758750bfe71a5529a333563+dirty",
+ "seed": 0,
+ "n_slides": 399,
+ "results": {
+  "raw": {
+   "center_probe": {
+    "tile": {
+     "n": 79800,
+     "auroc": 0.9999752782931355,
+     "balanced_accuracy": 0.9988177179962894
+    },
+    "tile_normal_only": {
+     "n": 77333,
+     "auroc": 0.9999975891999076,
+     "balanced_accuracy": 0.9989108726017417
+    },
+    "region": {
+     "n": 81487,
+     "auroc": 0.9999930644663548,
+     "balanced_accuracy": 0.9985203020584925
+    },
+    "region_normal_only": {
+     "n": 76654,
+     "auroc": 0.9999955903791933,
+     "balanced_accuracy": 0.9987927285247987
+    },
+    "slide": {
+     "n": 399,
+     "auroc": 1.0,
+     "balanced_accuracy": 0.9967532467532467
+    }
+   },
+   "tumor_probe_tile": {
+    "n": 45188,
+    "auroc": 0.9924545879444723,
+    "balanced_accuracy": 0.9662381722656828
+   },
+   "robustness_index": {
+    "n": 45188,
+    "k": 10,
+    "same_class_other_center": 1023,
+    "other_class_same_center": 11461,
+    "ri": 0.08925922694354768,
+    "same_center_fraction": 0.9977250597503762,
+    "same_class_fraction": 0.9746260069044879
+   }
+  },
+  "minus_slide_mean": {
+   "center_probe": {
+    "tile": {
+     "n": 79800,
+     "auroc": 0.48870367479459315,
+     "balanced_accuracy": 0.5038548237476809
+    },
+    "tile_normal_only": {
+     "n": 77333,
+     "auroc": 0.5470333095155528,
+     "balanced_accuracy": 0.5257225041253331
+    },
+    "region": {
+     "n": 81487,
+     "auroc": 0.5902823075006834,
+     "balanced_accuracy": 0.5671553646268364
+    },
+    "region_normal_only": {
+     "n": 76654,
+     "auroc": 0.6463350853629458,
+     "balanced_accuracy": 0.6039438129345852
+    }
+   },
+   "tumor_probe_tile": {
+    "n": 45188,
+    "auroc": 0.9782568084594911,
+    "balanced_accuracy": 0.9524694585960511
+   },
+   "robustness_index": {
+    "n": 45188,
+    "k": 10,
+    "same_class_other_center": 3821,
+    "other_class_same_center": 9768,
+    "ri": 0.39117526617526616,
+    "same_center_fraction": 0.9910662122687439,
+    "same_class_fraction": 0.9779056386651324
+   }
+  },
+  "minus_center_mean": {
+   "center_probe": {
+    "tile": {
+     "n": 79800,
+     "auroc": 0.5119141598197721,
+     "balanced_accuracy": 0.5139624304267161
+    },
+    "tile_normal_only": {
+     "n": 77333,
+     "auroc": 0.6954030863838088,
+     "balanced_accuracy": 0.6433557604567117
+    },
+    "region": {
+     "n": 81487,
+     "auroc": 0.32308515970408785,
+     "balanced_accuracy": 0.39152745246891707
+    },
+    "region_normal_only": {
+     "n": 76654,
+     "auroc": 0.8186150773758711,
+     "balanced_accuracy": 0.7796994407499264
+    },
+    "slide": {
+     "n": 399,
+     "auroc": 0.2777365491651206,
+     "balanced_accuracy": 0.3911873840445269
+    }
+   },
+   "tumor_probe_tile": {
+    "n": 45188,
+    "auroc": 0.9922308909864483,
+    "balanced_accuracy": 0.9651774341165873
+   },
+   "robustness_index": {
+    "n": 45188,
+    "k": 10,
+    "same_class_other_center": 1585,
+    "other_class_same_center": 8699,
+    "ri": 0.18220485113231405,
+    "same_center_fraction": 0.9963662919359122,
+    "same_class_fraction": 0.9806231742940603
+   }
+  }
+ },
+ "seconds": 183
+}
