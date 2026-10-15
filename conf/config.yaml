@@ -63,3 +63,5 @@ gate:                # promotion battery: initial proposals, to be agreed with t
   min_loco_worst_auroc: 0.85
   min_test_auroc: 0.90
   max_ece: 0.10
+  max_loco_ece: 0.10          # worst held-out centre, same limit as in CV
+  min_loco_specificity: 0.80  # worst held-out centre: share of normal slides called normal

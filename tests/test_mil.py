@@ -15,7 +15,8 @@ MIL = OmegaConf.create({"hidden": 32, "dropout": 0.0, "lr": 2e-3, "weight_decay"
                         "max_tiles": 256, "threshold": 0.5, "folds": 4, "device": "cpu", "normalize": "none",
                         "threads": 1})
 GATE = OmegaConf.create({"min_slides": 20, "min_cv_auroc": 0.9, "min_loco_worst_auroc": 0.85,
-                         "min_test_auroc": 0.9, "max_ece": 0.5})
+                         "min_test_auroc": 0.9, "max_ece": 0.5, "max_loco_ece": 0.5,
+                         "min_loco_specificity": 0.5})
 
 
 def synthetic(n: int = 64, seed: int = 0):
@@ -70,6 +71,13 @@ def test_protocol_learns_the_planted_signal_and_passes_the_gate():
     verdict = gate(m, result["n_slides"], strict)
     assert verdict["status"] == "failed" and "ECE" in verdict["reasons"][0]
 
+    # an unseen centre: calibrated and specific enough, or the battery fails
+    assert m["loco_worst_ece"] == max(v["ece"] for v in m["loco"].values())
+    assert m["loco_worst_specificity"] == min(v["specificity"] for v in m["loco"].values())
+    for limit in ({"max_loco_ece": 0.0}, {"min_loco_specificity": 1.01}):
+        reasons = gate(m, result["n_slides"], OmegaConf.merge(GATE, limit))["reasons"]
+        assert len(reasons) == 1 and "leave-one-center-out" in reasons[0]
+
 
 def test_slide_mean_normalisation_ignores_what_every_tile_shares():
     torch = pytest.importorskip("torch")
@@ -104,8 +112,10 @@ def test_across_seeds_averages_every_metric_and_keeps_the_spread():
     from tumordetector.mil.evaluate import across_seeds
 
     a = {"cv": {"n": 10, "auroc": 0.9, "ece": 0.1}, "loco_worst_auroc": 0.8, "test": {"auroc": 0.95},
+         "loco_worst_ece": 0.1, "loco_worst_specificity": 0.9,
          "attention_auroc_mean": None}
     b = {"cv": {"n": 10, "auroc": 0.7, "ece": 0.3}, "loco_worst_auroc": 0.9, "test": {"auroc": 0.97},
+         "loco_worst_ece": 0.2, "loco_worst_specificity": 0.8,
          "attention_auroc_mean": 0.5}
     mean, spread = across_seeds([a, b])
     assert mean["cv"] == {"n": 10, "auroc": pytest.approx(0.8), "ece": pytest.approx(0.2)}
@@ -122,6 +132,7 @@ def test_protocol_reports_what_it_cannot_run():
     assert {r["status"] for r in result["runs"]} == {"skipped"}
     assert all(r["reason"] for r in result["runs"])
     assert result["model"] is None and result["metrics"]["loco_worst_auroc"] is None
+    assert result["metrics"]["loco_worst_ece"] is None and result["metrics"]["loco_worst_specificity"] is None
     assert gate(result["metrics"], result["n_slides"], GATE)["status"] == "insufficient_data"
 
 

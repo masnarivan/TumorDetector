@@ -108,7 +108,12 @@ def run_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: int) -
         return {str(k): binary_metrics(v.y, v.p, cfg.threshold) for k, v in g.groupby(by)}
 
     loco = group_metrics("loco", "evaluation")
-    loco_aurocs = [m["auroc"] for m in loco.values() if m["auroc"] is not None]
+
+    def loco_worst(key: str, worst):
+        """Worst held-out centre for one metric; None unless every centre was measured."""
+        values = [m[key] for m in loco.values() if m.get(key) is not None]
+        return worst(values) if len(values) == dev.center.nunique() > 1 else None
+
     att = pd.DataFrame(att_scores, columns=["slide_id", "group", "attention_auroc"])
     return {
         "n_slides": int(len(table)), "n_dev": int(len(dev)), "n_held_out": int(len(held_out)),
@@ -117,7 +122,9 @@ def run_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: int) -
             "cv": group_metrics("cv"),                       # pooled out-of-fold predictions
             "cv_by_center": group_metrics("cv", "center"),
             "loco": loco,
-            "loco_worst_auroc": min(loco_aurocs) if len(loco_aurocs) == dev.center.nunique() > 1 else None,
+            "loco_worst_auroc": loco_worst("auroc", min),
+            "loco_worst_ece": loco_worst("ece", max),
+            "loco_worst_specificity": loco_worst("specificity", min),
             "test": group_metrics("test"),
             "test_by_center": group_metrics("test", "center"),
             "attention_auroc_mean": float(att[att.group == "cv"].attention_auroc.mean())
@@ -138,6 +145,10 @@ def gate(metrics: dict, n_slides: int, cfg) -> dict:
         ("AUROC peggiore in leave-one-center-out", metrics["loco_worst_auroc"], ">=", cfg.min_loco_worst_auroc),
         ("AUROC sullo split di test bloccato", metrics["test"].get("auroc"), ">=", cfg.min_test_auroc),
         ("ECE in cross-validation", metrics["cv"].get("ece"), "<=", cfg.max_ece),
+        # A centre never seen in training: the score must stay calibrated and the normals normal.
+        ("ECE peggiore in leave-one-center-out", metrics["loco_worst_ece"], "<=", cfg.max_loco_ece),
+        ("Specificità peggiore in leave-one-center-out", metrics["loco_worst_specificity"], ">=",
+         cfg.min_loco_specificity),
     ]
     reasons = []
     for name, value, op, limit in checks:

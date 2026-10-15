@@ -8,7 +8,7 @@ BATTERY = [
     ("Leave-one-center-out, risultato peggiore", "sì"),
     ("Test esterno bloccato", "sì, quando gli embedding dello split di test sono disponibili"),
     ("Robustezza al centro (Robustness Index, probe lineare sul centro)", "no"),
-    ("Calibrazione (ECE)", "sì, aggregata; per centro nella tabella per centro"),
+    ("Calibrazione (ECE)", "sì: in CV e sul centro escluso peggiore; per centro nelle tabelle"),
     ("Copertura conformal", "no: il modello non produce ancora insiemi di predizione"),
     ("OOD", "no"),
     ("Metriche alla prevalenza reale, tasso di rinvio", "no"),
@@ -32,7 +32,8 @@ def _metric_rows(named: dict) -> str:
 
 
 # Metrics shown seed by seed: the ones the battery reads, calibration and errors per centre.
-SPREAD = ["cv/auroc", "cv/ece", "loco_worst_auroc", "test/auroc", "test/ece", "attention_auroc_mean"]
+SPREAD = ["cv/auroc", "cv/ece", "loco_worst_auroc", "loco_worst_ece", "loco_worst_specificity",
+          "test/auroc", "test/ece", "attention_auroc_mean"]
 SPREAD_SUFFIX = ("/auroc", "/ece", "/sensitivity", "/specificity")
 
 
@@ -78,7 +79,8 @@ def render(result: dict, verdict: dict, context: dict) -> str:
                       **{f"Leave-one-center-out, {k}": v for k, v in m["loco"].items()},
                       "Split di test bloccato": m["test"]}),
         "",
-        f"AUROC peggiore tra i centri esclusi: **{_fmt(m['loco_worst_auroc'])}**.",
+        f"Centro escluso peggiore (per seme, poi media): AUROC **{_fmt(m['loco_worst_auroc'])}**, "
+        f"ECE **{_fmt(m['loco_worst_ece'])}**, specificità **{_fmt(m['loco_worst_specificity'])}**.",
         "",
         "### Per centro",
         "",
