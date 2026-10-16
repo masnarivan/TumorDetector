@@ -1,0 +1,145 @@
+{
+ "threshold": 0.5863344669342041,
+ "median": [
+  {
+   "role": "calibration",
+   "label": 0,
+   "S0": 0.521,
+   "S0_normal_tiles": 0.521
+  },
+  {
+   "role": "calibration",
+   "label": 1,
+   "S0": 0.522,
+   "S0_normal_tiles": 0.515
+  },
+  {
+   "role": "eval_id",
+   "label": 0,
+   "S0": 0.514,
+   "S0_normal_tiles": 0.514
+  },
+  {
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.572,
+   "S0_normal_tiles": 0.544
+  },
+  {
+   "role": "eval_ood",
+   "label": 0,
+   "S0": 0.923,
+   "S0_normal_tiles": 0.923
+  },
+  {
+   "role": "eval_ood",
+   "label": 1,
+   "S0": 0.955,
+   "S0_normal_tiles": 0.95
+  }
+ ],
+ "eval_id_referred_by_label": {
+  "S0": {
+   "0": 2,
+   "1": 9
+  },
+  "S0_normal_tiles": {
+   "0": 2,
+   "1": 5
+  }
+ },
+ "calibration_above_threshold_by_label": {
+  "0": 0,
+  "1": 2
+ },
+ "eval_id_referred": [
+  {
+   "slide_id": "test_011",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.766,
+   "S0_normal_tiles": 0.766,
+   "tumor_tiles": 0
+  },
+  {
+   "slide_id": "test_013",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.595,
+   "S0_normal_tiles": 0.595,
+   "tumor_tiles": 0
+  },
+  {
+   "slide_id": "test_021",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.687,
+   "S0_normal_tiles": 0.538,
+   "tumor_tiles": 435
+  },
+  {
+   "slide_id": "test_051",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.646,
+   "S0_normal_tiles": 0.64,
+   "tumor_tiles": 17
+  },
+  {
+   "slide_id": "test_074",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.629,
+   "S0_normal_tiles": 0.629,
+   "tumor_tiles": 0
+  },
+  {
+   "slide_id": "test_081",
+   "role": "eval_id",
+   "label": 0,
+   "S0": 0.645,
+   "S0_normal_tiles": 0.645,
+   "tumor_tiles": 0
+  },
+  {
+   "slide_id": "test_082",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.588,
+   "S0_normal_tiles": 0.584,
+   "tumor_tiles": 9
+  },
+  {
+   "slide_id": "test_090",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.606,
+   "S0_normal_tiles": 0.539,
+   "tumor_tiles": 220
+  },
+  {
+   "slide_id": "test_108",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.588,
+   "S0_normal_tiles": 0.586,
+   "tumor_tiles": 5
+  },
+  {
+   "slide_id": "test_117",
+   "role": "eval_id",
+   "label": 1,
+   "S0": 0.629,
+   "S0_normal_tiles": 0.629,
+   "tumor_tiles": 0
+  },
+  {
+   "slide_id": "test_119",
+   "role": "eval_id",
+   "label": 0,
+   "S0": 0.632,
+   "S0_normal_tiles": 0.632,
+   "tumor_tiles": 0
+  }
+ ]
+}

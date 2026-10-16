@@ -1,0 +1,259 @@
+{
+ "code_version": "7588ac78ad23204f2e17a42db7610d5d4140fac2+dirty",
+ "seed": 0,
+ "collection": "phikon__057cc0295895",
+ "prototypes": 256,
+ "criterion": {
+  "false_referral": [
+   0.02,
+   0.08
+  ],
+  "tumor_false_referrals_max": 2,
+  "detection_min": 0.95,
+  "auroc_min": 0.98
+ },
+ "criterion_reference": "kcenter_256",
+ "acceptable": {
+  "S0": false,
+  "S1": false,
+  "S2": false,
+  "S3": false
+ },
+ "chosen": null,
+ "results": {
+  "kcenter_256": {
+   "S0": {
+    "threshold": 0.5863344669342041,
+    "false_referral": 0.14864864864864866,
+    "false_referrals": 11,
+    "normal_false_referrals": 2,
+    "tumor_false_referrals": 9,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 0.9997542997542997,
+    "spearman_tumor_frac": 0.1261143756710296,
+    "spearman_low_tissue_frac": 0.06437615697889669,
+    "referred": [
+     "test_011",
+     "test_013",
+     "test_021",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_082",
+     "test_090",
+     "test_108",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S1": {
+    "threshold": 0.5669817924499512,
+    "false_referral": 0.16216216216216217,
+    "false_referrals": 12,
+    "normal_false_referrals": 2,
+    "tumor_false_referrals": 10,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 0.9997542997542997,
+    "spearman_tumor_frac": 0.10697978074163199,
+    "spearman_low_tissue_frac": 0.09084110212098073,
+    "referred": [
+     "test_011",
+     "test_013",
+     "test_021",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_082",
+     "test_090",
+     "test_104",
+     "test_108",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S2": {
+    "threshold": 0.522792398929596,
+    "false_referral": 0.16216216216216217,
+    "false_referrals": 12,
+    "normal_false_referrals": 3,
+    "tumor_false_referrals": 9,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 0.9997542997542997,
+    "spearman_tumor_frac": 0.11480756957638556,
+    "spearman_low_tissue_frac": 0.12005923731951128,
+    "referred": [
+     "test_011",
+     "test_013",
+     "test_021",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_082",
+     "test_090",
+     "test_108",
+     "test_111",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S3": {
+    "threshold": 1.0850045680999756,
+    "false_referral": 0.1891891891891892,
+    "false_referrals": 14,
+    "normal_false_referrals": 3,
+    "tumor_false_referrals": 11,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 1.0,
+    "spearman_tumor_frac": -0.4248749828641239,
+    "spearman_low_tissue_frac": -0.10166604961125507,
+    "referred": [
+     "test_002",
+     "test_010",
+     "test_011",
+     "test_013",
+     "test_051",
+     "test_053",
+     "test_074",
+     "test_075",
+     "test_081",
+     "test_082",
+     "test_097",
+     "test_104",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "rho": {
+    "median": 0.5923280715942383,
+    "p10": 0.5103979110717773,
+    "p90": 0.6796297430992126
+   }
+  },
+  "full": {
+   "S0": {
+    "threshold": 0.5059479475021362,
+    "false_referral": 0.13513513513513514,
+    "false_referrals": 10,
+    "normal_false_referrals": 2,
+    "tumor_false_referrals": 8,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 1.0,
+    "spearman_tumor_frac": 0.14437921628545458,
+    "spearman_low_tissue_frac": 0.18904109589041093,
+    "referred": [
+     "test_011",
+     "test_021",
+     "test_040",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_090",
+     "test_108",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S1": {
+    "threshold": 0.4894253611564636,
+    "false_referral": 0.14864864864864866,
+    "false_referrals": 11,
+    "normal_false_referrals": 2,
+    "tumor_false_referrals": 9,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 0.9997542997542997,
+    "spearman_tumor_frac": 0.17482061730949622,
+    "spearman_low_tissue_frac": 0.24475379489078114,
+    "referred": [
+     "test_011",
+     "test_013",
+     "test_021",
+     "test_040",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_090",
+     "test_108",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S2": {
+    "threshold": 0.4431512728333473,
+    "false_referral": 0.10810810810810811,
+    "false_referrals": 8,
+    "normal_false_referrals": 2,
+    "tumor_false_referrals": 6,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 0.9997542997542997,
+    "spearman_tumor_frac": 0.08132202844993977,
+    "spearman_low_tissue_frac": 0.2727730470196223,
+    "referred": [
+     "test_011",
+     "test_021",
+     "test_051",
+     "test_074",
+     "test_081",
+     "test_108",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "S3": {
+    "threshold": 1.1281801462173462,
+    "false_referral": 0.22972972972972974,
+    "false_referrals": 17,
+    "normal_false_referrals": 4,
+    "tumor_false_referrals": 13,
+    "n_normal": 50,
+    "n_tumor": 24,
+    "detection": 1.0,
+    "auroc": 1.0,
+    "spearman_tumor_frac": -0.2748423635313472,
+    "spearman_low_tissue_frac": -0.04767123287671232,
+    "referred": [
+     "test_002",
+     "test_010",
+     "test_011",
+     "test_013",
+     "test_051",
+     "test_068",
+     "test_074",
+     "test_075",
+     "test_081",
+     "test_082",
+     "test_097",
+     "test_104",
+     "test_106",
+     "test_108",
+     "test_112",
+     "test_117",
+     "test_119"
+    ]
+   },
+   "rho": {
+    "median": 0.43093910813331604,
+    "p10": 0.31976887583732605,
+    "p90": 0.5516215562820435
+   }
+  }
+ },
+ "seconds": {
+  "kcenter_256": 2,
+  "full": 1004
+ },
+ "device": "mps"
+}

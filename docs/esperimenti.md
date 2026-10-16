@@ -9,7 +9,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E1 | Fughe di dati tra split: quasi-duplicati tra sviluppo e test | fatto: nessun duplicato | se l'AUROC 0.993 sul test è credibile |
 | E2 | Probe sul centro (Robustness Index) a livello tile, regione, vetrino | fatto: centro codificato ovunque | se e quanto mitigare l'effetto centro |
 | E3 | OOD con DB completo, sottoinsieme k-center e regioni | fatto: k-center basta, il punteggio no | il ridisegno del vector DB |
-| E3b | Punteggio OOD indipendente dalla composizione del tessuto | protocollo scritto | come rinviare un vetrino OOD |
+| E3b | Punteggio OOD indipendente dalla composizione del tessuto | fatto: nessun candidato accettabile | come rinviare un vetrino OOD |
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 | E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
 
@@ -451,7 +451,60 @@ regioni lontane si mostrano al patologo, il vetrino non viene rinviato in blocco
 soprattutto i falsi rinvii. Il quarto più familiare (S2) può nascondere un problema locale
 (artefatto su una parte del vetrino): quello resta compito del QC (GrandQC), non dell'OOD.
 
-**Risultati.** —
+**Risultati** (16/10/2026, `experiments/e3b_ood_score.py`, report in `data/reports/experiments/e3b/`).
+Eseguito come da protocollo. Il k-center è quello del vector DB (`vectordb/reduce.py`: primo
+prototipo la tile più vicina alla media del vetrino), non quello con seme casuale di E3; con S0 i
+falsi rinvii sono gli stessi di E3 (11 su 74 con k-center 256, 10 con il riferimento completo).
+L'analisi a posteriori è in `experiments/e3b_posthoc.py`.
+
+Riferimento k-center 256 (quello del criterio); 74 vetrini Radboud di test, 50 normali e 24 tumorali:
+
+| | Falsi rinvii | Normali | Tumorali | Utrecht rilevati | AUROC | Spearman frazione tumore | Spearman poco tessuto |
+|---|---|---|---|---|---|---|---|
+| S0 media | 0,149 | 2 | 9 | 1,00 | 1,000 | 0,13 | 0,06 |
+| S1 mediana | 0,162 | 2 | 10 | 1,00 | 1,000 | 0,11 | 0,09 |
+| S2 25° percentile | 0,162 | 3 | 9 | 1,00 | 1,000 | 0,11 | 0,12 |
+| S3 relativa a ρ | 0,189 | 3 | 11 | 1,00 | 1,000 | −0,42 | −0,10 |
+
+Riferimento completo (confronto): falsi rinvii S0 0,135, S1 0,149, S2 0,108, S3 0,230; tumorali
+rinviati 8, 9, 6, 13.
+
+**Esito del criterio: nessun candidato è accettabile** (tutti oltre 0,08 di falsi rinvii e oltre 2
+vetrini tumorali). Come stabilito, il rinvio OOD a livello di vetrino con un punteggio unico non
+viene adottato; il passo successivo è il rinvio per regione.
+
+**Analisi a posteriori** (non nel protocollo, quindi solo ipotesi). I falsi rinvii sono quasi tutti
+vetrini tumorali (9 su 24 contro 2 su 50 normali, quanto atteso con α 0,05), eppure il punteggio non
+segue la quantità di tumore (Spearman 0,1). Ricalcolando S0 sulle sole tile normali dei vetrini,
+con la stessa soglia:
+
+- 5 dei 9 vetrini tumorali restano rinviati: 4 non hanno nessuna tile tumorale tra le 500
+  campionate (`test_011`, `test_013`, `test_074`, `test_117`), uno ne ha 17 (`test_051`). Solo
+  `test_021` e `test_090` (435 e 220 tile tumorali) sono rinviati per il tumore. Il meccanismo 1 di
+  E3 spiega 2 vetrini su 9, non la maggioranza;
+- lo spostamento riguarda i vetrini tumorali del **test ufficiale**, non quelli del training: in
+  calibrazione (folds 3–4 di Radboud) la mediana di S0 è 0,522 nei tumorali e 0,521 nei normali, e
+  sopra soglia ci sono 2 tumorali su 29; nel test Radboud la mediana è 0,572 nei tumorali (0,544
+  sulle sole tile normali) e 0,514 nei normali.
+
+Ipotesi: nel test ufficiale di CAMELYON16 i vetrini tumorali di Radboud differiscono da quelli del
+training in tutto il tessuto, non solo nel tumore (lotto di preparazione o di scansione diverso, o
+linfonodi metastatici con un aspetto diverso anche fuori dalla metastasi). Se è un lotto diverso,
+quei rinvii sono almeno in parte cambi di dominio veri, e non falsi rinvii. I dati qui non bastano
+per distinguere le due ipotesi.
+
+**Conclusioni.**
+
+1. Nessuna statistica del vetrino (media, mediana, percentile, densità locale) toglie i rinvii in
+   eccesso: il problema non è come si riassumono le distanze delle tile.
+2. S3 (densità locale) peggiora: corregge troppo e penalizza i vetrini con poco tumore.
+3. Prossimo passo, come da protocollo: il rinvio per regione. Le regioni lontane vengono mostrate al
+   patologo; il vetrino non viene rinviato in blocco.
+4. Da verificare su CAMELYON17, con il punteggio e la soglia fissati prima: se anche lì i vetrini
+   tumorali risultano spostati rispetto ai normali dello stesso centro. Una verifica diretta
+   dell'ipotesi del lotto: le date di scansione nei metadati dei .tif di CAMELYON16 (training
+   contro test), leggibili scaricando solo l'intestazione dei file.
+
 
 ## E5 — Compressione dei vettori nel vector DB
 
