@@ -1,0 +1,399 @@
+slide_id,case_year,manufacturer,software,pixel_spacing,center,split,label,case_has_other_slide,cv_fold
+normal_001,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_002,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_003,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_004,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_005,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_006,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_007,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_008,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_009,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_010,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_011,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_012,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_013,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_014,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_015,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_016,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_017,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_018,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_019,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_020,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_021,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_022,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_023,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_024,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_025,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_026,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_027,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_028,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_029,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_030,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_031,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_032,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_033,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_034,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_035,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_036,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_037,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_038,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_039,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_040,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_041,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_042,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_043,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_044,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_045,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_046,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_047,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_048,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_049,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_050,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_051,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_052,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_053,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_054,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_055,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_056,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_057,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_058,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_059,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_060,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_061,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_062,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_063,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_064,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_065,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_066,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_067,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_068,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_069,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_070,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_071,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_072,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_073,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_074,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_075,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_076,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_077,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_078,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_079,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_080,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_081,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_082,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_083,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_084,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_085,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,2
+normal_087,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_088,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_089,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_090,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_091,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_092,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_093,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_094,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_095,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,1
+normal_096,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,3
+normal_097,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,4
+normal_098,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_099,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_100,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,0,False,0
+normal_101,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_102,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_103,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_104,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_105,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_106,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_107,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,3
+normal_108,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_109,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_110,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_111,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_112,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_113,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,4
+normal_114,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_115,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_116,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_117,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_118,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_119,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_120,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_121,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_122,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_123,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_124,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_125,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_126,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_127,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_128,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_129,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_130,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_131,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,1
+normal_132,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,0
+normal_133,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,2
+normal_134,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,4
+normal_135,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_136,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_137,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,1
+normal_138,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_139,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,1
+normal_140,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_141,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,4
+normal_142,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,1
+normal_143,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_145,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_146,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_147,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_148,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_149,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_150,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_151,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,2
+normal_152,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_153,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,1
+normal_154,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,2
+normal_155,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,2
+normal_156,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+normal_157,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_158,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,0,False,3
+normal_159,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,0
+normal_160,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,0,False,2
+test_001,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_002,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_003,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_004,2012,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,test,1,False,-1
+test_005,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_006,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_007,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_008,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_009,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_010,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_011,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_012,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_013,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_014,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_015,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_016,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_017,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_018,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_019,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_020,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_021,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_022,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_023,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_024,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_025,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_026,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_027,2008,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_028,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_029,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_030,2008,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_031,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_032,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_033,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_034,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_035,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_036,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_037,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_038,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_039,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_040,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_041,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_042,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_043,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_044,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_045,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_046,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_047,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_048,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_050,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_051,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_052,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_053,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_054,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_055,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_056,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_057,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_058,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_059,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_060,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_061,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_062,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_063,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_064,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_065,2016,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_066,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_067,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_068,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_069,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_070,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_071,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_072,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_073,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_074,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_075,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_076,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_077,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_078,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_079,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_080,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_081,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_082,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_083,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_084,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_085,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_086,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_087,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_088,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_089,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_090,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_091,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_092,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_093,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_094,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_095,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_096,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_097,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_098,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_099,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_100,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_101,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_102,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_103,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_104,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_105,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_106,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_107,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_108,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_109,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_110,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_111,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_112,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_113,2012,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_114,2016,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_115,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_116,2013,Hamamatsu,"""4.0.3""","""0.000227397"" ""0.000227516""",utrecht,test,1,True,-1
+test_117,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_118,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_119,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_120,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_121,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,1,False,-1
+test_122,2016,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,1,False,-1
+test_123,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_124,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_125,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_126,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_127,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_128,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,test,0,False,-1
+test_129,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+test_130,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,test,0,False,-1
+tumor_001,2007,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_002,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_003,2006,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_004,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_005,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_006,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_007,2009,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_008,2006,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_009,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_010,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_011,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_012,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_013,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_014,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_015,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_016,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_017,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_018,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_019,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_020,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_021,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_022,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_023,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_024,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_025,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_026,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_027,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_028,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_029,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_030,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_031,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_032,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_033,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_034,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_035,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_036,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_037,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_038,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_039,2007,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_040,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_041,2010,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_042,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_043,2007,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_044,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_045,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_046,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_047,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_048,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_049,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_050,2011,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_051,2006,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_052,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_053,2009,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,2
+tumor_054,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_055,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_056,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_057,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_058,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_059,2009,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_060,2008,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_061,2015,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_062,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_063,2008,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,4
+tumor_064,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_065,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_066,2013,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_067,2012,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_068,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,3
+tumor_069,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1
+tumor_070,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,0
+tumor_071,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,4
+tumor_072,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_073,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_074,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,1
+tumor_075,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_076,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,0
+tumor_077,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_078,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_079,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_080,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_081,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_082,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,4
+tumor_083,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_084,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_085,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,0
+tumor_086,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_087,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,4
+tumor_088,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_089,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_090,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,4
+tumor_091,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,True,1
+tumor_092,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_093,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,4
+tumor_094,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,1
+tumor_095,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,4
+tumor_096,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_097,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_098,2014,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,2
+tumor_099,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_100,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_101,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_102,2015,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_103,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_104,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_105,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,2
+tumor_106,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,3
+tumor_107,2014,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_108,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,4
+tumor_109,2013,Hamamatsu,"""4.0.3""","""0.000226316"" ""0.000226321""",utrecht,train,1,False,0
+tumor_110,2015,Hamamatsu,"""4.0.3""","""0.000226891"" ""0.000226907""",utrecht,train,1,False,4
+tumor_111,2014,3D Histech,"""4.0.3""","""0.000243094"" ""0.000243094""",radboud,train,1,False,1

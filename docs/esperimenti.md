@@ -493,6 +493,32 @@ linfonodi metastatici con un aspetto diverso anche fuori dalla metastasi). Se è
 quei rinvii sono almeno in parte cambi di dominio veri, e non falsi rinvii. I dati qui non bastano
 per distinguere le due ipotesi.
 
+**Verifica dei metadati** (16/10/2026, a posteriori, `experiments/e3b_scan_metadata.py`, report in
+`data/reports/experiments/e3b/scan_metadata.*`). Lette per HTTP le intestazioni dei .tif di CAMELYON16
+(398 su 399; `normal_144` non ha l'XML Philips). Le date di scansione non ci sono. Scanner, versione
+del software e conversione in TIFF sono identici per tutti i vetrini di un centro. C'è invece il nome
+del file d'origine, che per Radboud è il numero di caso di anatomia patologica `T<aa>-<numero>`: da
+lì l'anno del caso (accettazione, non necessariamente scansione).
+
+| Radboud | Anni dei casi, vetrini tumorali | 2015 |
+|---|---|---|
+| Riferimento E3 (folds 0–2) | 2006–2014 | 0 su 42 |
+| Calibrazione (folds 3–4) | 2007–2015 | 2 su 29 |
+| Test ufficiale | 2008–2015 | **12 su 24** |
+
+Nel test, i tumorali del 2015 rinviati sono 8 su 12, quelli degli altri anni 1 su 12. Nei normali
+del 2015 (6 nel riferimento, 6 nel test) solo 1 su 6 è rinviato. Il punteggio cresce con l'anno nei
+tumorali del test (Spearman 0,72), non in calibrazione (−0,11).
+
+Quindi i "falsi rinvii" tumorali di E3/E3b sono quasi tutti **vetrini metastatici del 2015**, un
+gruppo che il riferimento non contiene affatto. È un cambio di dominio vero dentro Radboud (un lotto
+diverso di preparazione, colorazione o scansione dei casi metastatici del 2015) più che un difetto del
+punteggio. I dati non dicono perché riguardi i tumorali e non i normali dello stesso anno.
+
+**Un paziente in due split.** Il caso Utrecht `T13-15766` ha due vetrini: `tumor_091` (training) e
+`test_116` (test ufficiale). E1 non lo aveva trovato perché sono vetrini diversi, non quasi-duplicati.
+È l'unico caso ripetuto tra i 398 letti.
+
 **Conclusioni.**
 
 1. Nessuna statistica del vetrino (media, mediana, percentile, densità locale) toglie i rinvii in
@@ -501,9 +527,12 @@ per distinguere le due ipotesi.
 3. Prossimo passo, come da protocollo: il rinvio per regione. Le regioni lontane vengono mostrate al
    patologo; il vetrino non viene rinviato in blocco.
 4. Da verificare su CAMELYON17, con il punteggio e la soglia fissati prima: se anche lì i vetrini
-   tumorali risultano spostati rispetto ai normali dello stesso centro. Una verifica diretta
-   dell'ipotesi del lotto: le date di scansione nei metadati dei .tif di CAMELYON16 (training
-   contro test), leggibili scaricando solo l'intestazione dei file.
+   tumorali risultano spostati rispetto ai normali dello stesso centro.
+5. Il riferimento OOD deve coprire gli anni (o i lotti) dei casi, non solo i centri: un riferimento
+   senza i casi metastatici di un anno li rinvia. Per CAMELYON17 l'anno va letto dalle intestazioni
+   prima di scegliere riferimento e calibrazione.
+6. `test_116` condivide il paziente con `tumor_091`: va tolto dalle metriche sul test (o il paziente
+   unificato nel manifest), e il numero di caso va usato come `patient_pseudo_id` dove c'è.
 
 
 ## E5 — Compressione dei vettori nel vector DB
