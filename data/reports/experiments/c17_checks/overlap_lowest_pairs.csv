@@ -1,0 +1,61 @@
+a,b,r_min,center_a,center_b,relation
+camelyon16/normal_111,camelyon16/tumor_073,1.0779302,utrecht,utrecht,c16-c16
+camelyon16/normal_133,camelyon16/normal_148,1.0924673,utrecht,utrecht,c16-c16
+camelyon16/test_054,camelyon16/normal_080,1.0931083,radboud,radboud,c16-c16
+camelyon16/test_036,camelyon16/normal_095,1.0958973,radboud,radboud,c16-c16
+camelyon16/normal_119,camelyon16/normal_148,1.0999248,utrecht,utrecht,c16-c16
+camelyon16/normal_106,camelyon16/normal_152,1.101717,utrecht,utrecht,c16-c16
+camelyon16/normal_147,camelyon16/normal_152,1.1054845,utrecht,utrecht,c16-c16
+camelyon16/normal_001,camelyon16/tumor_024,1.1084871,radboud,radboud,c16-c16
+camelyon16/tumor_015,camelyon16/tumor_045,1.1090884,radboud,radboud,c16-c16
+camelyon16/normal_111,camelyon16/tumor_080,1.110512,utrecht,utrecht,c16-c16
+camelyon16/test_036,camelyon16/test_076,1.1106759,radboud,radboud,c16-c16
+camelyon16/test_085,camelyon16/normal_033,1.1113905,radboud,radboud,c16-c16
+camelyon16/test_036,camelyon16/test_054,1.1115642,radboud,radboud,c16-c16
+camelyon16/normal_146,camelyon16/normal_148,1.1136771,utrecht,utrecht,c16-c16
+camelyon16/tumor_015,camelyon16/tumor_032,1.1156036,radboud,radboud,c16-c16
+camelyon17/patient_006_node_3,camelyon17/patient_006_node_4,1.0792707,radboud,radboud,c17 same patient
+camelyon17/patient_009_node_1,camelyon17/patient_009_node_3,1.0801725,radboud,radboud,c17 same patient
+camelyon17/patient_011_node_2,camelyon17/patient_011_node_3,1.1325291,radboud,radboud,c17 same patient
+camelyon17/patient_082_node_3,camelyon17/patient_082_node_4,1.1587148,lpon,lpon,c17 same patient
+camelyon17/patient_050_node_1,camelyon17/patient_050_node_2,1.1742898,utrecht,utrecht,c17 same patient
+camelyon17/patient_060_node_2,camelyon17/patient_060_node_4,1.1857353,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_096_node_1,camelyon17/patient_096_node_3,1.1944519,lpon,lpon,c17 same patient
+camelyon17/patient_060_node_2,camelyon17/patient_060_node_3,1.1970453,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_079_node_0,camelyon17/patient_079_node_1,1.1984273,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_067_node_2,camelyon17/patient_067_node_4,1.1996441,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_079_node_0,camelyon17/patient_079_node_2,1.2045667,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_012_node_2,camelyon17/patient_012_node_4,1.2093095,radboud,radboud,c17 same patient
+camelyon17/patient_075_node_0,camelyon17/patient_075_node_1,1.2127194,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_065_node_1,camelyon17/patient_065_node_4,1.2209089,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_067_node_2,camelyon17/patient_067_node_3,1.2225083,rijnstate,rijnstate,c17 same patient
+camelyon17/patient_096_node_1,camelyon17/patient_099_node_1,1.0821816,lpon,lpon,c17 other patient
+camelyon17/patient_085_node_2,camelyon17/patient_099_node_1,1.0846126,lpon,lpon,c17 other patient
+camelyon17/patient_087_node_4,camelyon17/patient_099_node_1,1.0875537,lpon,lpon,c17 other patient
+camelyon17/patient_064_node_3,camelyon17/patient_067_node_3,1.1050925,rijnstate,rijnstate,c17 other patient
+camelyon17/patient_089_node_1,camelyon17/patient_093_node_3,1.1089096,lpon,lpon,c17 other patient
+camelyon17/patient_005_node_4,camelyon17/patient_018_node_1,1.1129162,radboud,radboud,c17 other patient
+camelyon17/patient_071_node_1,camelyon17/patient_074_node_0,1.114009,rijnstate,rijnstate,c17 other patient
+camelyon17/patient_085_node_2,camelyon17/patient_087_node_4,1.1158752,lpon,lpon,c17 other patient
+camelyon17/patient_006_node_4,camelyon17/patient_009_node_1,1.1159176,radboud,radboud,c17 other patient
+camelyon17/patient_006_node_1,camelyon17/patient_016_node_3,1.1235349,radboud,radboud,c17 other patient
+camelyon17/patient_087_node_4,camelyon17/patient_096_node_1,1.1333486,lpon,lpon,c17 other patient
+camelyon17/patient_060_node_2,camelyon17/patient_070_node_2,1.1340196,rijnstate,rijnstate,c17 other patient
+camelyon17/patient_094_node_0,camelyon17/patient_099_node_1,1.1344131,lpon,lpon,c17 other patient
+camelyon17/patient_044_node_3,camelyon17/patient_049_node_2,1.1367234,utrecht,utrecht,c17 other patient
+camelyon17/patient_085_node_2,camelyon17/patient_096_node_1,1.1374669,lpon,lpon,c17 other patient
+camelyon16/normal_144,camelyon17/patient_070_node_4,1.1808996,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_076_node_4,1.2448113,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_063_node_1,1.2815866,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_066_node_1,1.2820611,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_072_node_4,1.2836828,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_063_node_3,1.2891302,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_074_node_1,1.2901549,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_072_node_0,1.2935553,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_061_node_0,1.3086977,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_079_node_2,1.3159804,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_067_node_3,1.3182105,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_078_node_0,1.3217735,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_065_node_2,1.3274846,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_069_node_2,1.3275684,radboud,rijnstate,c16-c17
+camelyon16/normal_144,camelyon17/patient_068_node_1,1.3460107,radboud,rijnstate,c16-c17

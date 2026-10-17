@@ -12,6 +12,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E3b | Punteggio OOD indipendente dalla composizione del tessuto | fatto: nessun candidato accettabile | come rinviare un vetrino OOD |
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 | E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
+| C17 | Controlli su CAMELYON17: annotazioni, metadati, sovrapposizione con CAMELYON16 | fatto | se le etichette e gli split di CAMELYON17 sono usabili |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -582,3 +583,77 @@ La distanza dal più vicino è quella del punteggio OOD (E3).
    che distinguono un centro o un tessuto nuovo, cioè quello che il punteggio OOD deve vedere.
    Se mai la si usasse, andrebbe rivalidata sul rilevamento OOD (E3/E3b), non solo sul recall.
 5. Un'altra leva, da misurare con E3: meno prototipi per vetrino (128 invece di 256).
+
+## C17 — Controlli su CAMELYON17 prima dell'uso
+
+Controlli del 18/10/2026, dopo l'estrazione dei 500 vetrini etichettati (Phikon; tutti passano il QC).
+Codice: `experiments/c17_checks.py`; report in `data/reports/experiments/c17_checks/`. I vetrini sono
+letti da remoto per intervalli HTTP, senza scaricarli.
+
+**1. Annotazioni contro griglia di tile** (50 vetrini con XML: 17 macro, 17 micro, 16 ITC). I nomi dei
+gruppi sono quelli già gestiti (`Tumor`, un `Exclusion`). Le immagini sovrapposte dei 5 casi dubbi
+(`overlays/`) mostrano **annotazioni allineate** in tutti i centri, LPON (Philips) compreso: il contorno
+cade sempre su gruppi di cellule tumorali.
+
+- `patient_089_node_3` (LPON, micro, nessuna tile tumorale): annotazione corretta, ma minuscola,
+  0,02 mm² in 7 frammenti, il più grande 0,006 mm² (~80 µm), lungo il seno sottocapsulare. Una tile
+  è 0,0125 mm² e diventa "tumore" solo oltre metà della superficie: dà 9 tile `boundary`, nessuna
+  `tumor`. Lo stesso per `patient_046_node_4` (Utrecht, micro, 78 frammenti, il più grande
+  0,009 mm²). Per area annotata sono vicini a un'ITC.
+- In 15 vetrini su 50 non c'è nessuna tile `tumor` (13 ITC su 16, 2 micro su 17): con l'etichetta a
+  metà tile le ITC sono quasi invisibili a livello di tile.
+- **Tumore fuori dalla griglia.** In 6 vetrini meno del 90% del tumore annotato cade in una tile:
+  `patient_068_node_1` 0%, `patient_064_node_0` 31%, `patient_067_node_4` 31%, `patient_060_node_3`
+  58% (Rijnstate), `patient_089_node_3` 69%, `patient_021_node_3` 74%. Le immagini mostrano cellule
+  tumorali nella capsula, nel seno sottocapsulare al bordo del tessuto e nel grasso perilinfonodale:
+  zone con meno del 50% di tessuto per tile (`tiling.min_tissue`), dove la griglia non arriva. Non è
+  un errore delle annotazioni ma un **punto cieco della pipeline**: proprio dove le metastasi
+  iniziano (seno sottocapsulare) e dove stanno le ITC nel grasso.
+
+**2. Metadati di scansione.** I .tif di Radboud, CWZ, Utrecht e Rijnstate in CAMELYON17 sono TIFF
+convertiti senza metadati (nessuna descrizione, nessuna data): l'anno dei casi non si può leggere.
+Gli LPON sono TIFF Philips nativi, con data e scanner:
+
+- acquisiti tra il 4/4/2016 e il 16/9/2016, su **5 scanner Philips diversi** (numeri di serie FMT0061,
+  FMT0063, FMT0106, FMT0107, FMT0113) e 3 versioni del software;
+- i 5 linfonodi di un paziente sono scansionati a distanza mediana di 107 giorni (massimo 155);
+- nessuna differenza di data tra diagnosi (mediane tutte in giugno 2016).
+
+**3. Sovrapposizione con CAMELYON16.** La misura di E1 (rapporto R tra distanza dal vetrino j e
+distanza da sé, 200 tile per vetrino) su tutte le coppie dei 899 vetrini.
+
+| Coppie | R minimo | 1° percentile | Mediana |
+|---|---|---|---|
+| CAMELYON16 tra loro (E1) | 1,08 | 1,19 | 1,95 |
+| CAMELYON16 – CAMELYON17 | 1,18 | 1,66 | 2,44 |
+| CAMELYON17, stesso paziente | 1,08 | 1,20 | 1,67 |
+| CAMELYON17, pazienti diversi | 1,08 | 1,30 | 2,45 |
+
+Nessuna coppia con R ≤ 1: **nessun vetrino ripetuto o quasi uguale** tra i due dataset.
+**Limite:** questa misura non vede lo stesso paziente con un altro tessuto. Il controllo positivo lo
+mostra: `tumor_091` e `test_116`, stesso paziente in CAMELYON16 (E3b), hanno R 2,37, al posto 51.568
+su 79.401 coppie. Dentro CAMELYON17 i linfonodi dello stesso paziente sono più vicini degli altri
+(mediana 1,67 contro 2,45), probabilmente perché preparati insieme; fra due dataset preparati in
+anni diversi non c'è da aspettarselo. La sovrapposizione di pazienti tra CAMELYON16 e 17 (stessi
+centri Radboud e Utrecht) resta **non verificabile** con i dati pubblici.
+
+**4. Un'anomalia in CAMELYON16.** Le coppie CAMELYON16–17 più vicine hanno tutte `normal_144`
+(Radboud), vicino a vetrini Rijnstate (R 1,18–1,29). È l'unico dei 399 file CAMELYON16 non in
+formato Philips: è un TIFF convertito come quelli di CAMELYON17 (stesse dimensioni, 94.968 ×
+210.579 pixel, di 203 vetrini CAMELYON17 di CWZ, Radboud e Rijnstate). Non coincide con nessun file
+CAMELYON17 (md5 diverso). Probabilmente è una riscansione o riconversione successiva: un vetrino
+con un "dominio" diverso dagli altri 243 di Radboud.
+
+**Conseguenze.**
+
+1. Le etichette CAMELYON17 sono usabili: le annotazioni sono allineate in tutti i centri.
+2. La regola delle ITC (etichetta vuota, esclusi dal binario) è coerente con quello che si vede: a
+   livello di tile sono quasi invisibili.
+3. Il filtro sul tessuto taglia capsula, seno sottocapsulare al bordo e grasso perilinfonodale. Va
+   misurato quanto conta (tumore annotato perso per centro) e provata una soglia più bassa o una
+   griglia sul bordo, con QC sugli artefatti. Riguarda anche CAMELYON16.
+4. Split di CAMELYON17 per paziente (5 linfonodi per paziente, più simili tra loro). L'anno dei casi
+   non è disponibile, quindi il riferimento OOD non può essere bilanciato per anno come suggerito da
+   E3b, tranne che per LPON (data di scansione).
+5. LPON ha 5 scanner diversi: un sottogruppo naturale per verificare la robustezza allo scanner.
+6. `normal_144` va segnato nel manifest come vetrino con conversione diversa.

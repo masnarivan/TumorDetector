@@ -85,9 +85,10 @@ class RangeFile(io.RawIOBase):
         return n
 
 
-def attributes(slide_id: str) -> dict[str, str]:
-    """Every leaf attribute of the Philips XML; repeated names (one per scanned image) get a suffix."""
-    f = RangeFile(camelyon16.slide_url(slide_id))
+def attributes(slide_id: str, url: str | None = None) -> dict[str, str]:
+    """Every leaf attribute of the Philips XML; repeated names (one per scanned image) get a suffix.
+    `url`: another dataset's file (default: the CAMELYON16 slide)."""
+    f = RangeFile(url or camelyon16.slide_url(slide_id))
     with tifffile.TiffFile(io.BufferedReader(f, 1 << 18)) as t:
         page = t.pages.first
         desc, software, datetime = page.description, page.software, page.tags.valueof("DateTime")
