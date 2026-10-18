@@ -227,3 +227,133 @@ stages:
       md5: f9455c2c9c5064a463a54f78e7331786.dir
       size: 6806007
       nfiles: 399
+  head-ln_metastasis:
+    cmd: td task=train_head backbone=phikon head=ln_metastasis
+    deps:
+    - path: data/camelyon17/embeddings/phikon
+      hash: md5
+      md5: d36228f0a7ad6012f211068c99a159f6.dir
+      size: 6755114134
+      nfiles: 1502
+    - path: data/embeddings/phikon
+      hash: md5
+      md5: 2a019ce647034be8a47f53ebe084a8bf.dir
+      size: 6711132866
+      nfiles: 1198
+    - path: data/manifests/camelyon16.csv
+      hash: md5
+      md5: 722667410c873977d1fb327e1ec71f90
+      size: 90474
+    - path: data/manifests/camelyon17.csv
+      hash: md5
+      md5: 424abe6de38c8e0302a0ddd37ffed283
+      size: 122501
+    - path: data/manifests/heads/ln_metastasis.csv
+      hash: md5
+      md5: 3f881059cb8dc3770db9b737a78e40e7
+      size: 72136
+    - path: src/tumordetector/config.py
+      hash: md5
+      md5: 193f14bf2002011d9392250bfa97b8b8
+      size: 564
+    - path: src/tumordetector/embed/store.py
+      hash: md5
+      md5: 0d4382b83a0ba9c7d02e68d601fc7e90
+      size: 2871
+    - path: src/tumordetector/heads
+      hash: md5
+      md5: ad32628fb37e8242fcb514dbca6c223e.dir
+      size: 28868
+      nfiles: 5
+    - path: src/tumordetector/io.py
+      hash: md5
+      md5: 03d2503f88d79f650b1e7d5d5c0e0fcd
+      size: 2953
+    - path: src/tumordetector/mil
+      hash: md5
+      md5: a868783229ccab265d1b647584f91407.dir
+      size: 20117
+      nfiles: 4
+    - path: src/tumordetector/tasks/train_head.py
+      hash: md5
+      md5: 50e3f5373bb7e75b76e206e16b743044
+      size: 8926
+    params:
+      conf/config.yaml:
+        mil.device: cpu
+        mil.dropout: 0.25
+        mil.epochs: 30
+        mil.folds: 5
+        mil.hidden: 256
+        mil.lr: 0.0002
+        mil.max_tiles: 4096
+        mil.normalize: none
+        mil.seeds:
+        - 0
+        - 1
+        - 2
+        mil.threads: 1
+        mil.threshold: 0.5
+        mil.weight_decay: 0.0001
+      conf/head/ln_metastasis.yaml:
+        calibration:
+          method: temperature
+          inner_folds: 3
+        datasets:
+        - camelyon16
+        - camelyon17
+        domain:
+        - dataset
+        - center
+        gate:
+          min_slides: 100
+          min_cv_auroc: 0.9
+          min_loco_worst_auroc: 0.85
+          max_ece: 0.1
+          max_loco_ece: 0.1
+          min_loco_specificity: 0.8
+          max_center_probe_auroc: 0.8
+          min_robustness_index: 0.5
+        id: ln_metastasis
+        labels:
+          negative: 0
+          micro: 1
+          macro: 1
+        module: M4
+        roles:
+          external:
+            center:
+            - lpon
+        sites:
+        - C77.3
+        task: binary
+        version: 1
+    outs:
+    - path: data/reports/phikon/heads/ln_metastasis/attention.csv
+      hash: md5
+      md5: b76ac1429ee3b2fb0d3a9b14b1ff37a0
+      size: 31173
+    - path: data/reports/phikon/heads/ln_metastasis/calibration.json
+      hash: md5
+      md5: ae874807ee8d2a6fd1ebac8f35cfa913
+      size: 239
+    - path: data/reports/phikon/heads/ln_metastasis/excluded.csv
+      hash: md5
+      md5: bc94fb532e46e2c246c03769b6b69c6d
+      size: 112
+    - path: data/reports/phikon/heads/ln_metastasis/metrics.json
+      hash: md5
+      md5: 11b68a3bf33a6b144170cdc6b3cb2b2d
+      size: 59540
+    - path: data/reports/phikon/heads/ln_metastasis/model.pt
+      hash: md5
+      md5: 3cbde1cfed8d77a93074ce8ad73e1a16
+      size: 1055781
+    - path: data/reports/phikon/heads/ln_metastasis/predictions.csv
+      hash: md5
+      md5: d21608d72ca8d5355e38daedba5e4cc1
+      size: 681974
+    - path: data/reports/phikon/heads/ln_metastasis/report.md
+      hash: md5
+      md5: db0e142406e215f47518ece576f4af40
+      size: 11969

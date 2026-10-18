@@ -13,7 +13,8 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 | E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
 | C17 | Controlli su CAMELYON17: annotazioni, metadati, sovrapposizione con CAMELYON16 | fatto | se le etichette e gli split di CAMELYON17 sono usabili |
-| E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | protocollo fissato | se più centri bastano; riferimento per le mitigazioni (E7) |
+| E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | fatto: gate non superato, i normali di un centro nuovo salgono | se più centri bastano; riferimento per le mitigazioni (E7) |
+| E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | protocollo fissato | quale ricetta di training adottare per le teste |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -726,4 +727,135 @@ non è verificabile (C17 §3): può gonfiare la CV, non il leave-one-centre-out.
 cieco della griglia resta (C17 §1). La temperatura è un solo parametro: corregge la scala, non uno
 spostamento diverso per classe. La CV calibrata è ottimista (la temperatura è stimata sulle stesse
 predizioni): il gate la usa, ma la misura che conta è quella in leave-one-centre-out.
+
+**Risultati** (18/10/2026, codice `72140b2`, `dvc repro -s head-ln_metastasis`, circa 3 ore e mezza
+con tre semi in parallelo; report in `data/reports/phikon/heads/ln_metastasis/`, modello
+`head-ln_metastasis-phikon` v1, alias `candidate`). Eseguito come da protocollo; i 92 vetrini LPON
+non sono stati letti.
+
+| Voce del gate | Media (semi 0, 1, 2) | Soglia | Esito |
+|---|---|---|---|
+| AUROC in CV | 0,989 (0,992; 0,987; 0,988) | ≥ 0,90 | sì |
+| AUROC peggiore in leave-one-centre-out | 0,974 (0,970; 0,978; 0,974) | ≥ 0,85 | sì |
+| ECE calibrata in CV | 0,033 | ≤ 0,10 | sì |
+| **ECE calibrata peggiore in leave-one-centre-out** | **0,293** (0,252; 0,414; 0,214) | ≤ 0,10 | **no** |
+| **Specificità peggiore in leave-one-centre-out** | **0,430** (0,561; 0,091; 0,638) | ≥ 0,80 | **no** |
+| **Probe sul centro, negativi** | **0,999** | ≤ 0,80 | **no** |
+| Robustness Index | 2,65 (vicini dallo stesso centro 97%) | ≥ 0,5 | sì |
+
+Per centro escluso (media sui semi):
+
+| Centro escluso | AUROC | Sensibilità | Specificità | ECE calibrata | Temperatura della rotazione |
+|---|---|---|---|---|---|
+| CWZ | 0,976 | 0,962 | 0,770 | 0,186 | 2,05 |
+| Radboud | 0,984 | 0,978 | 0,911 (C16 0,878; C17 0,990) | 0,105 | 1,76 |
+| Rijnstate | 0,978 | 0,938 | 0,972 | 0,033 | 1,75 |
+| Utrecht | 0,980 | 0,981 | **0,492** (0,091–0,823) | **0,273** | 1,86 |
+
+- Effetto della temperatura: ECE peggiore in leave-one-centre-out da 0,320 (grezza) a 0,293. Temperatura
+  globale 1,69: dopo 30 epoche il modello è troppo sicuro, ma non è questo il problema principale.
+- Confronto con CAMELYON16 (Utrecht escluso, vetrini Utrecht di CAMELYON16): ECE calibrata **0,275**,
+  specificità **0,427**, contro E4 `none` 0,146 e 0,864. Aggiunta a posteriori: E4 valutava solo i 99
+  vetrini Utrecht dello split di training; sugli stessi 99 vetrini E6 dà ECE 0,268 e specificità 0,458.
+- Attenzione: AUROC 0,988 (E4 `none` 0,989).
+
+**Lettura secondo il protocollo.**
+
+- **Il gate non è superato**: ECE e specificità sul centro escluso peggiore, e probe sul centro.
+- **"Più centri aiutano": no.** Sul centro comune la calibrazione e la specificità peggiorano
+  (ECE +0,13, specificità −0,41), ben oltre i margini fissati.
+- Il probe sopra 0,80 era atteso e non invalida le altre misure.
+- E6 è il riferimento di E7.
+
+**Analisi a posteriori** (non nel protocollo, quindi ipotesi). Mediana delle logit per centro, in CV
+(centro visto) e in leave-one-centre-out (centro escluso):
+
+| Centro | Negativi, CV | Negativi, escluso | Positivi, CV | Positivi, escluso |
+|---|---|---|---|---|
+| CWZ | −6,1 | −2,7 | 11,3 | 10,9 |
+| Radboud | −6,6 | −3,8 | 12,5 | 12,1 |
+| Rijnstate | −9,5 | −6,4 | 13,0 | 13,7 |
+| Utrecht | −8,0 | **+0,1** | 11,8 | 11,9 |
+
+- **Lo spostamento riguarda solo i vetrini negativi.** Su un centro mai visto i positivi restano dove
+  sono; i negativi salgono verso il tumore, fino a metà dei normali di Utrecht oltre la soglia. Il
+  modello ha imparato "normale" come "tessuto normale come appare negli scanner del training": un
+  tessuto normale non familiare è spinto verso il positivo. Le tile tumorali, che l'attenzione
+  seleziona, bastano invece a riconoscere il tumore in ogni centro (AUROC peggiore 0,974).
+- **Una temperatura non può correggerlo**: cambia la scala, non uno spostamento che colpisce una sola
+  classe, e non sposta la decisione a 0,5. Quello che manca è una correzione dell'offset sui negativi
+  del centro nuovo.
+- **Utrecht è l'unico centro con uno scanner diverso** (Hamamatsu). Senza di lui il training vede solo
+  vetrini 3DHistech (Radboud di CAMELYON16 e 17, CWZ, Rijnstate). In E4 il training era il solo Radboud
+  di CAMELYON16 e Utrecht stava meglio: aggiungere centri dello stesso scanner sembra rendere il modello
+  più sicuro su quel dominio e più fragile sugli altri. È coerente con E2: il centro è leggibile ovunque.
+- **La variabilità tra semi è enorme proprio dove il modello fallisce** (specificità di Utrecht da 0,09
+  a 0,82): la posizione dei normali di un dominio nuovo non è vincolata dal training.
+- Dentro Radboud, i vetrini di CAMELYON16 sono specifici 0,878 contro 0,990 di quelli di CAMELYON17:
+  il dominio conta anche dentro un centro (coerente con E3b).
+- Dettaglio del protocollo emerso: con 5 fold e `cv_fold mod 3` i fold interni sono sbilanciati (il
+  terzo ha circa la metà dei vetrini). Non cambia la lettura; si tiene uguale in E7 per confrontabilità.
+
+**Conseguenze.**
+
+1. Per E7 il problema da risolvere è chiaro: **la posizione dei negativi di un dominio nuovo**. Tra le
+   tre varianti, `stat_mix` è l'unica che agisce su questo (mescola le statistiche dei domini in
+   training); bilanciamento e group DRO agiscono sul peso dei domini visti.
+2. La decisione "solo calibrazione globale" va ridiscussa se E7 non basta: una correzione dell'offset
+   con pochi vetrini **negativi** del centro nuovo (non serve una diagnosi positiva) risolverebbe
+   proprio lo spostamento osservato. Resta una decisione da prendere, non una modifica del protocollo.
+3. Il rinvio OOD diventa più importante: i normali di un dominio nuovo sono esattamente i casi da
+   rinviare finché il modello non è calibrato su quel dominio.
+4. Il test esterno (LPON, Philips: un terzo scanner) per ora non va consultato: il gate non è superato.
+
+## E7 — Mitigazioni del centro nella testa
+
+Protocollo fissato il 18/10/2026, **dopo la fine dell'esecuzione di E6 e prima di leggerne i
+risultati**. Riferimento: E6.
+
+**Domanda.** A parità di dati, split, protocollo, temperatura e gate, una ricetta di training
+migliora la calibrazione sul centro escluso peggiore o riduce quanto il centro è leggibile nella
+rappresentazione della testa, senza perdere capacità di distinguere e di localizzare?
+
+**Disegno.** Tre varianti, ognuna contro E6 (ricetta vuota), stesso codice e stessi tre semi:
+
+1. `balanced`: in ogni epoca ogni dominio pesa uguale e, dentro il dominio, le due classi pesano
+   uguale (peso del vetrino = 1 / (n domini × 2 × vetrini della sua classe nel suo dominio),
+   normalizzato a media 1); sostituisce il `pos_weight` globale.
+2. `balanced + group_dro`: in più, perdita del dominio peggiore (Sagawa et al., 2020, versione
+   online): un peso q per dominio, aggiornato a ogni vetrino con q_d ← q_d · exp(η · perdita), η = 0,01,
+   poi normalizzato; la perdita del passo è moltiplicata per n domini × q del dominio del vetrino.
+3. `balanced + stat_mix`: in più, con probabilità 0,5 per vetrino e per passo, le tile vengono
+   standardizzate con media e deviazione standard del loro vetrino e riportate con una miscela
+   λ · (statistiche proprie) + (1 − λ) · (statistiche di un vetrino a caso di un altro dominio del
+   training), λ ~ Beta(0,1; 0,1) (MixStyle, Zhou et al., 2021, sulle statistiche per vetrino). Solo
+   in training; in inferenza il modello è quello di sempre.
+
+Gli iperparametri (η, p, α della Beta) sono fissati qui dai valori degli articoli, **non tarati**:
+con tre semi e quattro rotazioni una taratura sceglierebbe il rumore. I domini sono quelli del
+cohort (dataset × centro); il bilanciamento usa solo i domini presenti nel training della singola
+esecuzione (in leave-one-centre-out il centro escluso non c'è).
+
+**Esiti** (media sui tre semi, differenza da E6).
+
+- Primari: ECE calibrata peggiore in leave-one-centre-out; AUROC del probe sul centro (negativi).
+- Vincoli: AUROC peggiore in leave-one-centre-out, AUROC in CV, specificità peggiore in
+  leave-one-centre-out, AUROC dell'attenzione.
+- Secondari: Robustness Index, ECE grezza peggiore, metriche per centro e per dominio, temperature.
+
+**Criterio di adozione** (fissato ora). Una variante è adottata se migliora almeno uno dei primari
+— ECE calibrata peggiore in leave-one-centre-out **−0,03** o più, oppure probe sul centro **−0,10** o
+più — e rispetta tutti i vincoli: AUROC peggiore in leave-one-centre-out e AUROC in CV non scendono
+più di 0,01; specificità peggiore in leave-one-centre-out non scende più di 0,02; AUROC
+dell'attenzione non scende più di 0,02. Se più varianti sono adottabili, si sceglie quella che
+supera il gate; a parità, la più semplice nell'ordine 1, 2, 3. Combinazioni diverse da quelle
+elencate (per esempio group DRO + stat_mix) sono un nuovo protocollo, non una scelta a posteriori.
+
+**Se nessuna è adottata** si tiene la ricetta vuota. Se il probe resta sopra la soglia del gate per
+tutte, la decisione tra discriminatore avversariale e revisione della soglia si prende con i
+patologi, guardando calibrazione e specificità sul centro escluso, non il probe da solo.
+
+**Limiti.** Tre semi: in E4 la variabilità tra semi dell'ECE peggiore era dell'ordine di 0,07, più
+grande del margine di 0,03. Il report riporta il valore di ogni seme e l'esito va letto con quella
+incertezza. Un solo backbone (Phikon): la ricetta va rivalidata con H-optimus-0.
 
