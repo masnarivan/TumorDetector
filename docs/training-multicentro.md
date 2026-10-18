@@ -260,7 +260,7 @@ src/tumordetector/
   heads/cohort.py        unione dei manifest, mappa delle etichette, esclusi con motivo,
                          controllo della versione del backbone, colonna domain
   mil/abmil.py           invariato nel contratto; forward espone anche z (pooled) per le mitigazioni
-  mil/mitigations.py     balanced, group_dro, stat_mix dietro un'unica interfaccia
+  heads/mitigations.py   balanced, group_dro, stat_mix (fuori da mil/: il baseline non cambia)
   mil/train_loop.py      fit generico sulla ricetta (sostituisce abmil.fit)
   mil/calibrate.py       temperatura globale (fuori fold)
   mil/evaluate.py        protocollo: + temperatura nella rotazione, + probe sul centro e RI nel gate

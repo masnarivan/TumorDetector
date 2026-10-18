@@ -10,7 +10,7 @@ from tumordetector.config import dataset_cfg
 from tumordetector.io import code_version, write_json
 
 
-def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_folds: int) -> dict:
+def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_folds: int, recipe: list) -> dict:
     """The whole protocol for one seed; module level so a worker process can run it."""
     import torch
 
@@ -22,7 +22,7 @@ def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_fo
     # memory-mapped: parallel workers share one copy of the embeddings in the page cache
     bags = {s: np.load(root / f"{s}.npy", mmap_mode="r") for s, root in root_of.items()}
     return run_head_protocol(table, bags, lambda s: pd.read_parquet(root_of[s] / f"{s}.parquet").label.to_numpy(),
-                             OmegaConf.create(mil), seed, inner_folds)
+                             OmegaConf.create(mil), seed, inner_folds, recipe)
 
 
 def run(cfg: DictConfig):
@@ -69,10 +69,10 @@ def run(cfg: DictConfig):
     workers = min(cfg.mil.workers, len(seeds))
     if workers > 1:
         with ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")) as pool:
-            runs = [f.result() for f in [pool.submit(_train_seed, *args, s, spec.calibration.inner_folds)
+            runs = [f.result() for f in [pool.submit(_train_seed, *args, s, spec.calibration.inner_folds, spec.recipe)
                                          for s in seeds]]
     else:
-        runs = [_train_seed(*args, s, spec.calibration.inner_folds) for s in seeds]
+        runs = [_train_seed(*args, s, spec.calibration.inner_folds, spec.recipe) for s in seeds]
 
     metrics, spread = across_seeds([r["metrics"] for r in runs])
     result = {**runs[0], "metrics": metrics, "spread": spread, "seeds": seeds, "excluded": excluded,
@@ -86,6 +86,7 @@ def run(cfg: DictConfig):
     context = {"Modello": model_name, "Testa": f"{spec.id} v{spec.version} ({spec.module})",
                "Cohort": f"{path} (sha256 {cohort_sha[:12]})", "Collezione embedding": ident["collection"],
                "Versione backbone": ident["version"], "Iperparametri": hyper,
+               "Ricetta": ", ".join(spec.recipe) or "nessuna mitigazione",
                "Calibrazione": f"{spec.calibration.method}, {spec.calibration.inner_folds} fold interni nel LOCO",
                "Semi": f"{seeds} (modello e temperatura salvati: seme {seeds[0]})", "Versione codice": code}
 
@@ -110,7 +111,7 @@ def run(cfg: DictConfig):
         mlflow.log_params({"backbone": cfg.backbone.name, "backbone_version": ident["version"],
                            "collection": ident["collection"], "head": spec.id, "head_version": spec.version,
                            "cohort_sha256": cohort_sha, "n_dev": result["n_dev"], "code_version": code,
-                           "inner_folds": spec.calibration.inner_folds,
+                           "inner_folds": spec.calibration.inner_folds, "recipe": ",".join(spec.recipe) or "none",
                            **{f"mil.{k}": v for k, v in cfg.mil.items()}})
         flat = {"cv_auroc": "cv/auroc", "cv_ece": "cv/ece", "loco_worst_auroc": "loco_worst_auroc",
                 "loco_worst_ece": "loco_worst_ece", "center_probe_auroc": "robustness/center_probe_auroc",
@@ -137,6 +138,7 @@ def run(cfg: DictConfig):
                 client.set_registered_model_alias(model_name, "validated", version)
             tags = {"validation_status": verdict["status"], "collection": ident["collection"],
                     "head_version": spec.version, "cohort_sha256": cohort_sha,
+                    "recipe": ",".join(spec.recipe) or "none",
                     "temperature": calibration["temperature"]}
             for k, v in tags.items():
                 client.set_model_version_tag(model_name, version, k, str(v))

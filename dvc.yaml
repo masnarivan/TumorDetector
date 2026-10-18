@@ -155,6 +155,7 @@ stages:
           - labels
           - domain
           - roles
+          - recipe
           - calibration
           - gate
     outs:

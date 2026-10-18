@@ -20,6 +20,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from tumordetector.heads.mitigations import fit_recipe
 from tumordetector.mil.abmil import ABMIL, fit, predict_logits
 from tumordetector.mil.evaluate import attention_auroc, binary_metrics
 
@@ -120,13 +121,22 @@ def robustness(model: ABMIL, table: pd.DataFrame, bags: dict, tile_labels, seed:
     return out
 
 
-def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: int, inner_folds: int) -> dict:
+def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: int, inner_folds: int,
+                      recipe: list[str] = ()) -> dict:
     """`table`: one row per development slide with embeddings (slide_id, label, center, domain,
-    dataset, patient_pseudo_id, cv_fold, exhaustive_annot). `cfg`: the mil section."""
+    dataset, patient_pseudo_id, cv_fold, exhaustive_annot). `cfg`: the mil section. `recipe`: the
+    mitigations (heads/mitigations.py); empty = `abmil.fit`, the training of E6. Every model of the
+    protocol, inner calibration folds included, is trained with the same recipe."""
     if (table.role != "dev").any():
         raise ValueError("only development slides enter the protocol: the external test is read on its own")
     t = table.set_index("slide_id")
     runs, preds, att_scores = [], [], []
+
+    def train_model(ids: list):
+        bags_, labels = [bags[s] for s in ids], t.label[ids].to_numpy()
+        if recipe:
+            return fit_recipe(bags_, labels, t.domain[ids].to_numpy(), cfg, seed, list(recipe), cfg.device)
+        return fit(bags_, labels, cfg, seed, cfg.device)
 
     def train_score(train_ids: list, test_ids: list, name: str, group: str, keep: bool = True):
         """-> (model, logits) or (None, None) if it cannot be trained."""
@@ -136,7 +146,7 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             runs.append({**info, "status": "skipped",
                          "reason": "no slide to score" if not test_ids else "training slides of one class only"})
             return None, None
-        model = fit([bags[s] for s in train_ids], t.label[train_ids].to_numpy(), cfg, seed, cfg.device)
+        model = train_model(train_ids)
         logits, att = predict_logits(model, [bags[s] for s in test_ids], cfg.device)
         runs.append(info)
         if keep:
@@ -184,7 +194,7 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
 
     final = None
     if table.label.nunique() == 2:
-        final = fit([bags[s] for s in table.slide_id], table.label.to_numpy(), cfg, seed, cfg.device)
+        final = train_model(list(table.slide_id))
         runs.append({"group": "final", "name": "all development slides", "n_train": len(table), "n_test": 0,
                      "status": "ok", "reason": ""})
 

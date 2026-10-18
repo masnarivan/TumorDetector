@@ -5,6 +5,7 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from hydra import compose, initialize_config_dir
 from omegaconf import OmegaConf
 from pydantic import ValidationError
@@ -13,6 +14,7 @@ from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
+from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, fit_recipe
 from tumordetector.heads.protocol import (
     center_probe,
     fit_temperature,
@@ -253,3 +255,68 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
         tmp_path / "d1.csv", index=False)
     with pytest.raises(SystemExit, match="no longer matches"):
         cli.main(["task=train_head", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}"])
+
+
+# --- mitigations (experiment E7) -------------------------------------------------------------------
+
+def test_balanced_weights_give_every_domain_and_class_the_same_total():
+    domains = np.array(["a"] * 4 + ["b"] * 6)
+    labels = np.array([0, 0, 0, 1, 0, 0, 1, 1, 1, 1])
+    w = balanced_weights(labels, domains)
+    assert w.mean() == pytest.approx(1.0)
+    totals = pd.Series(w).groupby([domains, labels]).sum()
+    assert np.allclose(totals, totals.iloc[0])
+
+
+def test_group_dro_raises_the_weight_of_the_domain_that_loses_more():
+    dro = GroupDRO(np.array(["a", "b"]), eta=0.5)
+    for _ in range(5):
+        dro.scale(torch.tensor(2.0), "a")
+        dro.scale(torch.tensor(0.1), "b")
+    assert dro.q[dro.index["a"]] > dro.q[dro.index["b"]]
+    assert float(dro.scale(torch.tensor(1.0), "a")) > 1.0     # the worse domain's step counts more
+
+
+class _Rng:
+    """Stands in for numpy's generator: always mixes, always the first other slide, lambda = 0."""
+    def random(self):
+        return 0.0
+
+    def choice(self, a):
+        return a[0]
+
+    def beta(self, a, b):
+        return 0.0
+
+
+def test_stat_mix_gives_a_slide_the_statistics_of_another_domain():
+    rng = np.random.default_rng(0)
+    bags = [rng.normal(0, 1, (200, 4)).astype(np.float32), rng.normal(5, 3, (300, 4)).astype(np.float32),
+            rng.normal(0, 1, (100, 4)).astype(np.float32)]
+    mix = StatMix(bags, np.array(["a", "b", "a"]), _Rng(), p=1.0)
+    out = mix(torch.from_numpy(bags[0]), 0).numpy()                 # lambda 0: entirely slide 1's statistics
+    assert np.allclose(out.mean(0), bags[1].mean(0), atol=1e-3)
+    assert np.allclose(out.std(0), bags[1].std(0), rtol=1e-2)
+    alone = StatMix(bags[:1], np.array(["a"]), _Rng(), p=1.0)       # no other domain: unchanged
+    assert torch.equal(alone(torch.from_numpy(bags[0]), 0), torch.from_numpy(bags[0]))
+
+
+def test_recipes_are_checked_and_every_one_still_learns(manifest_row):
+    with pytest.raises(ValidationError):
+        HeadSpec(**{**SPEC, "recipe": ["dann"]})
+    with pytest.raises(ValueError, match="non-empty"):
+        fit_recipe([np.zeros((4, DIM))], np.array([0]), np.array(["a"]), MIL, 0, [])
+    manifest, bags, labels = synthetic_cohort(manifest_row)
+    spec = HeadSpec(**{**SPEC, "datasets": ["d1", "d2"], "recipe": ["balanced", "group_dro", "stat_mix"]})
+    cohort, _ = assemble(spec, {d: manifest[manifest.dataset == d] for d in ("d1", "d2")})
+    table = assign_folds(cohort, 3, seed=0).merge(manifest[["slide_id", "exhaustive_annot"]], on="slide_id")
+    dev = table[table.role == "dev"].reset_index(drop=True)
+    for recipe in (["balanced"], ["balanced", "group_dro"], ["balanced", "stat_mix"]):
+        out = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2, recipe=recipe)
+        assert out["metrics"]["cv"]["auroc"] > 0.9, recipe
+    plain = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2)
+    # every domain here has as many negatives as positives: balancing changes nothing, mixing does
+    same = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2, recipe=["balanced"])
+    mixed = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2, recipe=["balanced", "stat_mix"])
+    assert np.allclose(plain["predictions"].logit, same["predictions"].logit, atol=1e-4)
+    assert not np.allclose(plain["predictions"].logit, mixed["predictions"].logit)

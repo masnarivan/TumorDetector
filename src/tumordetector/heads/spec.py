@@ -1,8 +1,8 @@
 """What a head is: which slides it covers, how their diagnoses become labels, what counts as a domain
 and which slides are held out. One YAML file per head in conf/head/, checked here before any data is read.
 
-Also part of a head: how its scores are calibrated and the battery it must pass. The training recipe
-(mitigations) joins the spec with experiment E7.
+Also part of a head: its training recipe (mitigations against the centre effect, experiment E7), how
+its scores are calibrated and the battery it must pass.
 """
 from typing import Literal
 
@@ -45,6 +45,7 @@ class HeadSpec(BaseModel):
     labels: dict[str, int] = Field(min_length=1)
     domain: list[str] = Field(min_length=1)
     roles: dict[Literal["external"], dict[str, list[str]]] = {}
+    recipe: list[Literal["balanced", "group_dro", "stat_mix"]] = []   # heads/mitigations.py; empty = E6
     calibration: Calibration = Calibration()
     gate: Gate
     overwrite: bool = False
@@ -61,6 +62,8 @@ class HeadSpec(BaseModel):
     def _labels_fit_the_task(self):
         if self.task == "binary" and sorted(set(self.labels.values())) != [0, 1]:
             raise ValueError(f"a binary head maps diagnoses onto 0 and 1, not {sorted(set(self.labels.values()))}")
+        if len(set(self.recipe)) != len(self.recipe):
+            raise ValueError(f"mitigations listed twice: {self.recipe}")
         if len(set(self.datasets)) != len(self.datasets):
             raise ValueError(f"datasets listed twice: {self.datasets}")
         return self

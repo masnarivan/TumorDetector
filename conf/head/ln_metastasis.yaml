@@ -15,6 +15,7 @@ labels:                            # reference_diagnosis -> label; anything else
 domain: [dataset, center]          # what counts as one domain for balancing and group DRO
 roles:                             # manifest column -> values; every other slide is development
   external: {center: [lpon]}       # locked external test: read only by `td task=external`
+recipe: []                         # mitigations, heads/mitigations.py: balanced, group_dro, stat_mix (E7)
 calibration:
   method: temperature              # one global temperature, from out-of-fold logits
   inner_folds: 3                   # leave-one-centre-out: folds of the training centres for its temperature
