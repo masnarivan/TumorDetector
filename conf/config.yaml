@@ -1,13 +1,15 @@
 defaults:
   - backbone: phikon
   - data: camelyon16
+  - head: ln_metastasis
   - _self_
 
-task: ???            # manifest | tile | embed | index | stream | splits | train
+task: ???            # manifest | tile | embed | index | stream | splits | cohort | train
 seed: 0
 
 paths:
-  out: data          # pipeline outputs (DVC-tracked), relative to the repo root
+  out: ${data.out}   # pipeline outputs (DVC-tracked), relative to the repo root: one folder per dataset
+  heads: data/manifests/heads   # cohort files of the heads (task=cohort), versioned in git
 
 tiling:              # must match the backbone's native input (checked at embed time)
   tile_px: 224

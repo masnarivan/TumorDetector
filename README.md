@@ -112,8 +112,21 @@ non ancora coperte.
 Gli esperimenti sugli embedding, con protocollo fissato prima dei risultati, sono in
 [docs/esperimenti.md](docs/esperimenti.md).
 
-Progetto (non ancora implementato) del training multi-centro con CAMELYON17 e delle teste per
-tessuto: [docs/training-multicentro.md](docs/training-multicentro.md).
+## Teste e cohort multi-centro
+
+Progetto del training multi-centro con CAMELYON17 e delle teste per tessuto:
+[docs/training-multicentro.md](docs/training-multicentro.md). Una testa è un file in `conf/head/`
+(sedi, dataset, mappa diagnosi → etichetta, dominio, centri esterni). Il suo cohort unisce i manifest
+dei dataset e assegna ruolo (sviluppo o esterno bloccato) e fold di CV, raggruppati per paziente:
+
+```bash
+uv run td task=cohort head=ln_metastasis
+```
+
+Scrive `data/manifests/heads/<testa>.csv` e `<testa>_excluded.csv` (con il motivo di ogni esclusione),
+versionati in git e mai riscritti in modo implicito (`head.overwrite=true`). Un test verifica che il
+cohort salvato corrisponda ancora ai manifest. Per `ln_metastasis`: 771 vetrini di sviluppo in 6
+domini (dataset × centro), 92 esterni (LPON), 36 ITC escluse. Il training sulle teste non c'è ancora.
 
 ## Backbone
 

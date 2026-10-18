@@ -30,6 +30,15 @@ NOT_EXHAUSTIVE = {
     "tumor_095", "tumor_110",
 }
 
+# Slides of one patient, found in the pathology case number of the original file name (experiment
+# E3b, TIFF headers): slide -> the slide whose patient it shares. The only repeat among 398 headers.
+SAME_PATIENT = {"test_116": "tumor_091"}   # Utrecht case T13-15766
+
+# Every CAMELYON16 file is a Philips-converted TIFF except this one, a generic TIFF like the
+# CAMELYON17 files of CWZ, Radboud and Rijnstate (experiment C17, section 4): probably a later
+# rescan or reconversion, a different "domain" from the other Radboud slides.
+GENERIC_TIFF = {"normal_144"}
+
 CENTERS = {0: "radboud", 1: "utrecht"}
 SCANNERS = {0: "3DHistech Pannoramic Flash II 250", 1: "Hamamatsu NanoZoomer-XR C12000-01"}
 
@@ -64,10 +73,10 @@ def to_manifest(ref: pd.DataFrame, sizes: dict[str, int], xmls: dict[str, int], 
         "slide_id": sid,
         "dataset": "camelyon16",
         "file_md5": sid.map(lambda s: md5.get(f"images/{s}.tif")),
-        # Assumption to verify: CAMELYON16 does not publish patient ids; one slide is treated
-        # as one patient. If two slides share a patient, splits by patient would leak.
-        "patient_pseudo_id": "c16_" + sid,
-        "case_id": "c16_" + sid,
+        # CAMELYON16 does not publish patient ids: one slide is one patient, except the slides
+        # found to share a patient (SAME_PATIENT), so that splits by patient keep them together.
+        "patient_pseudo_id": "c16_" + sid.replace(SAME_PATIENT),
+        "case_id": "c16_" + sid.replace(SAME_PATIENT),
         "center": ref["center"].map(CENTERS),
         "scanner": ref["center"].map(SCANNERS),
         "stain": "H&E",
@@ -81,6 +90,7 @@ def to_manifest(ref: pd.DataFrame, sizes: dict[str, int], xmls: dict[str, int], 
         "label": label,                                     # slide label used by MIL
         "size_gb": sid.map(lambda s: sizes.get(f"{s}.tif", 0) / 1e9).round(3),
         "has_xml": sid.map(lambda s: f"{s}.xml" in xmls),
+        "file_format": sid.isin(GENERIC_TIFF).map({True: "generic_tiff", False: "philips_tiff"}),
     })
     # Usable as tile-level ground truth: negatives (no tumor anywhere) and tumor slides
     # with exhaustive annotations. Not the 20 slides listed above.

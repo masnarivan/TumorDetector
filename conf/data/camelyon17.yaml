@@ -1,7 +1,8 @@
 name: camelyon17
 manifest: data/manifests/camelyon17.csv
-# Nothing on this Mac: slides are streamed (`td task=stream`). Outputs go in their own folder,
-# `paths.out=data/camelyon17`, so verify and index see one dataset per folder.
+# Nothing on this Mac: slides are streamed (`td task=stream`). Outputs go in their own folder, so
+# verify and index see one dataset per folder.
+out: data/camelyon17
 raw_dir: ${oc.env:TD_RAW_DIR,data/raw/camelyon17}
 slides: null                     # null = every manifest slide found in raw_dir; or a list of ids
 verify_md5: true

@@ -1,6 +1,7 @@
 # Training multi-centro e teste per tessuto — progetto
 
-Stato: **progetto approvato nelle scelte principali**, 18/10/2026. Niente è implementato. I
+Stato: **progetto approvato nelle scelte principali**, 18/10/2026. Implementati: manifest (paziente
+unificato, `file_format`), specifica della testa e cohort con ruoli e fold (`td task=cohort`). I
 protocolli degli esperimenti (E6, E7) passano in [esperimenti.md](esperimenti.md) prima di vedere i
 risultati, con le soglie di adozione.
 

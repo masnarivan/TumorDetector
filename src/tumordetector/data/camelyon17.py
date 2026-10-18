@@ -27,6 +27,9 @@ SCANNERS = {
     3: "3DHistech Pannoramic Flash II 250",
     4: "Philips IntelliSite Ultra Fast Scanner",
 }
+# File format, read from the TIFF headers (experiment C17, section 2): LPON files are native Philips
+# TIFFs with scan date and scanner; the other centres' are converted TIFFs with no metadata.
+PHILIPS_TIFF = {"lpon"}
 # Isolated tumour cells (pN0(i+)): node-negative for staging, yet tumour cells are present. A binary
 # tumour/normal label would be wrong either way, so it is left empty: excluded from binary
 # training and evaluation until the rule is agreed with the pathologists.
@@ -59,6 +62,8 @@ def to_manifest(stages: pd.DataFrame, sizes: dict[str, int], xmls: dict[str, int
         "patient_pn_stage": patient.map(pn),
         "size_gb": sid.map(lambda s: sizes.get(f"{s}.tif", 0) / 1e9).round(3),
         "has_xml": sid.map(lambda s: f"{s}.xml" in xmls),
+        "file_format": slides["center"].map(CENTERS).isin(PHILIPS_TIFF).map(
+            {True: "philips_tiff", False: "generic_tiff"}),
     })
     # Usable as tile-level ground truth: negatives, and the annotated slides ("exhaustively
     # annotated" in the bucket README).

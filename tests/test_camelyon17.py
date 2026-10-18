@@ -20,6 +20,7 @@ def test_manifest_rows():
     assert m.patient_pseudo_id.nunique() == 2 and m.loc["patient_041_node_2", "patient_pseudo_id"] == "c17_patient_041"
     assert m.loc["patient_041_node_0", "patient_pn_stage"] == "pN1mi"
     assert m.loc["patient_041_node_0", "center"] == "utrecht"
+    assert set(m.file_format) == {"generic_tiff"}                  # only LPON files are native Philips TIFFs
     assert m.label.tolist()[:3] == [0, 0, 1] and pd.isna(m.loc["patient_041_node_1", "label"])   # itc: no binary label
     # tile-level ground truth: negatives and annotated slides, not an unannotated positive
     assert m.exhaustive_annot.tolist() == [True, True, False, True, True]

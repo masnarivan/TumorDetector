@@ -7,6 +7,7 @@ tumordetector/tasks/, so a DVC stage depends only on the code it runs (tests/tes
   td task=stream backbone=phikon       download -> tile -> embed -> delete, slide by slide: the full dataset
   td task=index backbone=phikon        regions + k-center prototypes per slide -> Qdrant
   td task=splits                       data/manifests/<dataset>_splits.csv (cross-validation folds)
+  td task=cohort head=ln_metastasis    data/manifests/heads/<head>.csv: the head's slides, roles and folds
   td task=train backbone=phikon        ABMIL baseline, validation report, model registry
   td task=verify backbone=phikon       outputs on disk agree with their per-slide provenance
 
@@ -19,9 +20,10 @@ from pathlib import Path
 
 from hydra import compose, initialize_config_dir
 
-CONF_DIR = Path(os.environ.get("TD_CONF", Path(__file__).resolve().parents[2] / "conf"))
+from tumordetector.config import CONF_DIR
+
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "train", "verify")
+TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "cohort", "train", "verify")
 
 
 def load_env(path: Path = ENV_FILE):

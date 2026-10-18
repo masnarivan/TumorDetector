@@ -1,0 +1,18 @@
+# M4, lymph node: metastasis yes / no for a whole slide (docs/training-multicentro.md).
+# Validated by tumordetector/heads/spec.py. A change to sites, datasets, labels, domain or roles changes
+# the cohort: bump `version` and rewrite the cohort file on purpose (`td task=cohort head.overwrite=true`).
+id: ln_metastasis
+version: 1
+module: M4
+task: binary
+sites: [C77.3]                     # ICD-O-3 topography of the manifest rows this head covers
+datasets: [camelyon16, camelyon17]
+labels:                            # reference_diagnosis -> label; anything else is excluded, with the reason
+  negative: 0
+  micro: 1
+  macro: 1
+  # itc left out: isolated tumour cells are below a tile's resolution (experiment C17, section 1)
+domain: [dataset, center]          # what counts as one domain for balancing and group DRO
+roles:                             # manifest column -> values; every other slide is development
+  external: {center: [lpon]}       # locked external test: read only by `td task=external`
+overwrite: false                   # task=cohort only: the cohort file is never rewritten implicitly
