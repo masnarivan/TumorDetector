@@ -112,6 +112,9 @@ non ancora coperte.
 Gli esperimenti sugli embedding, con protocollo fissato prima dei risultati, sono in
 [docs/esperimenti.md](docs/esperimenti.md).
 
+Progetto (non ancora implementato) del training multi-centro con CAMELYON17 e delle teste per
+tessuto: [docs/training-multicentro.md](docs/training-multicentro.md).
+
 ## Backbone
 
 | Nome | Uso | Note |
