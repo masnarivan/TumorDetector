@@ -126,7 +126,20 @@ uv run td task=cohort head=ln_metastasis
 Scrive `data/manifests/heads/<testa>.csv` e `<testa>_excluded.csv` (con il motivo di ogni esclusione),
 versionati in git e mai riscritti in modo implicito (`head.overwrite=true`). Un test verifica che il
 cohort salvato corrisponda ancora ai manifest. Per `ln_metastasis`: 771 vetrini di sviluppo in 6
-domini (dataset × centro), 92 esterni (LPON), 36 ITC escluse. Il training sulle teste non c'è ancora.
+domini (dataset × centro), 92 esterni (LPON), 36 ITC escluse.
+
+`td task=train_head head=<testa>` (stadio DVC `head-<testa>`) addestra la testa sui soli vetrini di
+sviluppo del cohort; quelli esterni non vengono mai letti. Protocollo (esperimento E6):
+
+1. cross-validation sui fold del cohort; le sue logit fuori fold danno **una temperatura globale**;
+2. leave-one-centre-out su tutti i centri di sviluppo, con la temperatura stimata su fold interni
+   dei soli centri di training;
+3. modello finale su tutto lo sviluppo; sul modello finale, **probe lineare sul centro** dalla
+   rappresentazione del vetrino e **Robustness Index** sulle tile.
+
+Il gate è nella specifica della testa e comprende probe e Robustness Index. Il modello registrato
+(`head-<testa>-<backbone>`) restituisce una logit; la temperatura è in `calibration.json` e nei tag
+della versione. Report in `data/reports/<backbone>/heads/<testa>/`.
 
 ## Backbone
 

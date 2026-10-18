@@ -4,7 +4,7 @@ Written once as data/manifests/heads/<head>.csv and versioned in git, like the s
 excluded slide goes to <head>_excluded.csv with the reason. The cohort does not depend on the
 backbone: slides without embeddings are left out at training time, and reported there.
 
-  domain   the spec's `domain` columns joined (camelyon16/radboud, camelyon17/radboud, ...): finer than
+  domain   the spec's `domain` columns joined (camelyon16:radboud, camelyon17:radboud, ...): finer than
            the centre, because the same centre in two datasets is prepared and converted differently
            (experiments E3b and C17). Balancing and group DRO work on domains.
   role     dev, or external (locked test) if the slide matches the spec's `roles.external`.
@@ -52,7 +52,7 @@ def assemble(spec: HeadSpec, manifests: dict[str, pd.DataFrame]) -> tuple[pd.Dat
     excluded = m[reason != ""].assign(excluded_reason=reason[reason != ""])
 
     c = m[reason == ""].assign(label=label[reason == ""].astype(int))
-    c["domain"] = c[spec.domain].astype(str).agg("/".join, axis=1)
+    c["domain"] = c[spec.domain].astype(str).agg(":".join, axis=1)   # not "/": metric paths split on it
     external = np.zeros(len(c), dtype=bool)
     for column, values in spec.roles.get("external", {}).items():
         external |= c[column].isin(values).to_numpy()

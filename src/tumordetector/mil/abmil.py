@@ -27,14 +27,20 @@ class ABMIL(nn.Module):
         self.att_w = nn.Linear(hidden // 2, 1)
         self.head = nn.Linear(hidden, 1)
 
-    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """(n_tiles, dim) -> slide logit (scalar) and attention weights (n_tiles,), summing to 1."""
+    def encode(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """(n_tiles, dim) -> tile representations h (n_tiles, hidden), attention weights (n_tiles,)
+        summing to 1, and the pooled slide representation z (hidden,) the classifier reads."""
         if self.normalize == "slide_mean":
             x = x - x.mean(dim=0, keepdim=True)
         h = self.embed(x)
         scores = self.att_w(torch.tanh(self.att_v(h)) * torch.sigmoid(self.att_u(h))).squeeze(-1)
         weights = torch.softmax(scores, dim=0)
-        return self.head((weights[:, None] * h).sum(0)).squeeze(-1), weights
+        return h, weights, (weights[:, None] * h).sum(0)
+
+    def forward(self, x: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        """(n_tiles, dim) -> slide logit (scalar) and attention weights (n_tiles,), summing to 1."""
+        _, weights, z = self.encode(x)
+        return self.head(z).squeeze(-1), weights
 
 
 def fit(bags: list[np.ndarray], labels: np.ndarray, cfg, seed: int, device: str = "cpu") -> ABMIL:
@@ -59,6 +65,17 @@ def fit(bags: list[np.ndarray], labels: np.ndarray, cfg, seed: int, device: str 
             loss.backward()
             opt.step()
     return model.eval()
+
+
+def predict_logits(model: ABMIL, bags: list[np.ndarray], device: str = "cpu") -> tuple[np.ndarray, list[np.ndarray]]:
+    """-> logit per slide and attention weights per slide (all tiles, no subsampling)."""
+    logits, attention = [], []
+    with torch.inference_mode():
+        for bag in bags:
+            logit, w = model(torch.from_numpy(bag.astype(np.float32)).to(device))
+            logits.append(logit.item())
+            attention.append(w.cpu().numpy())
+    return np.array(logits), attention
 
 
 def predict(model: ABMIL, bags: list[np.ndarray], device: str = "cpu") -> tuple[np.ndarray, list[np.ndarray]]:

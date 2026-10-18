@@ -9,6 +9,7 @@ tumordetector/tasks/, so a DVC stage depends only on the code it runs (tests/tes
   td task=splits                       data/manifests/<dataset>_splits.csv (cross-validation folds)
   td task=cohort head=ln_metastasis    data/manifests/heads/<head>.csv: the head's slides, roles and folds
   td task=train backbone=phikon        ABMIL baseline, validation report, model registry
+  td task=train_head head=ln_metastasis  a head on its cohort: LOCO, temperature, robustness, registry
   td task=verify backbone=phikon       outputs on disk agree with their per-slide provenance
 
 Any config value can be overridden on the command line, e.g. `data.slides=[tumor_031]`.
@@ -23,7 +24,7 @@ from hydra import compose, initialize_config_dir
 from tumordetector.config import CONF_DIR
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "cohort", "train", "verify")
+TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "cohort", "train", "train_head", "verify")
 
 
 def load_env(path: Path = ENV_FILE):

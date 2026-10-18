@@ -1,11 +1,36 @@
 """What a head is: which slides it covers, how their diagnoses become labels, what counts as a domain
 and which slides are held out. One YAML file per head in conf/head/, checked here before any data is read.
 
-The training recipe, the aggregator and the gate join the spec when training moves onto heads.
+Also part of a head: how its scores are calibrated and the battery it must pass. The training recipe
+(mitigations) joins the spec with experiment E7.
 """
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+
+class Calibration(BaseModel):
+    """One global temperature (docs/training-multicentro.md: a new centre gives no slides). In
+    leave-one-centre-out it is estimated with `inner_folds` folds of the training centres only."""
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["temperature"] = "temperature"
+    inner_folds: int = Field(default=3, ge=2)
+
+
+class Gate(BaseModel):
+    """Promotion battery of the head: initial proposals, to be agreed with the pathologists. The
+    worst held-out centre counts; ECE is on calibrated probabilities, as the model is used."""
+    model_config = ConfigDict(extra="forbid")
+
+    min_slides: int
+    min_cv_auroc: float
+    min_loco_worst_auroc: float
+    max_ece: float
+    max_loco_ece: float
+    min_loco_specificity: float
+    max_center_probe_auroc: float      # linear probe of the centre from the head's slide representation
+    min_robustness_index: float        # neighbours of the same class elsewhere vs other class here
 
 
 class HeadSpec(BaseModel):
@@ -20,6 +45,8 @@ class HeadSpec(BaseModel):
     labels: dict[str, int] = Field(min_length=1)
     domain: list[str] = Field(min_length=1)
     roles: dict[Literal["external"], dict[str, list[str]]] = {}
+    calibration: Calibration = Calibration()
+    gate: Gate
     overwrite: bool = False
 
     @field_validator("sites")

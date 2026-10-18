@@ -1,6 +1,8 @@
 """Head spec and cohort: several datasets into one table of labels, domains, roles and folds."""
 from pathlib import Path
 
+import mlflow
+import numpy as np
 import pandas as pd
 import pytest
 from hydra import compose, initialize_config_dir
@@ -9,14 +11,27 @@ from pydantic import ValidationError
 
 from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
+from tumordetector.embed import store
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
+from tumordetector.heads.protocol import (
+    center_probe,
+    fit_temperature,
+    head_gate,
+    robustness_index,
+    run_head_protocol,
+    sigmoid,
+)
 from tumordetector.heads.spec import HeadSpec
-from tumordetector.io import write_json
+from tumordetector.io import read_json, write_json
+from tumordetector.mil.evaluate import across_seeds
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = {"id": "ln", "version": 1, "module": "M4", "task": "binary", "sites": ["C77.3"],
         "datasets": ["d1", "d2"], "labels": {"negative": 0, "macro": 1}, "domain": ["dataset", "center"],
-        "roles": {"external": {"center": ["z"]}}}
+        "roles": {"external": {"center": ["z"]}},
+        "gate": {"min_slides": 20, "min_cv_auroc": 0.9, "min_loco_worst_auroc": 0.85, "max_ece": 0.5,
+                 "max_loco_ece": 0.5, "min_loco_specificity": 0.5, "max_center_probe_auroc": 1.0,
+                 "min_robustness_index": 0.0}}
 
 
 def rows(manifest_row, dataset, specs):
@@ -51,7 +66,7 @@ def test_cohort_labels_domains_roles_and_says_why_it_left_slides_out(manifests):
     assert dict(zip(excluded.slide_id, excluded.excluded_reason, strict=True)) == {
         "a_itc": "reference_diagnosis 'itc' not in the head's labels",
         "a_breast": "site C50.9 not in the head's sites ['C77.3']"}
-    assert set(cohort.domain) == {"d1/x", "d2/x", "d2/z"}
+    assert set(cohort.domain) == {"d1:x", "d2:x", "d2:z"}
     assert set(cohort[cohort.role == "external"].slide_id) == {"z0", "z1", "z2", "z3"}
 
     folded = assign_folds(cohort, 3, seed=0)
@@ -116,3 +131,125 @@ def test_the_versioned_cohorts_match_the_manifests(monkeypatch):
         assert saved.exists(), f"no cohort for head {spec.id}: run `td task=cohort head={spec.id}`"
         manifests = {n: pd.read_csv(dataset_cfg(n).manifest) for n in spec.datasets}
         check_unchanged(pd.read_csv(saved), spec, manifests)
+
+
+# --- training on a head's cohort -------------------------------------------------------------------
+
+DIM = 16
+MIL = OmegaConf.create({"hidden": 32, "dropout": 0.0, "lr": 2e-3, "weight_decay": 0.0, "epochs": 8,
+                        "max_tiles": 256, "threshold": 0.5, "device": "cpu", "normalize": "none", "threads": 1})
+
+
+def synthetic_cohort(manifest_row, n_per_center: int = 12, seed: int = 0):
+    """Two datasets, four development centres and one external; each centre shifts every tile along
+    its own axis (the centre is readable, as in E2), a positive slide has ~10% tumour tiles."""
+    rng = np.random.default_rng(seed)
+    centers = {"a": "d1", "b": "d1", "c": "d2", "d": "d2", "z": "d2"}
+    rows, bags, labels = [], {}, {}
+    for ci, (c, ds) in enumerate(centers.items()):
+        for i in range(n_per_center):
+            sid, y = f"{c}{i:02d}", i % 2
+            x = rng.normal(size=(rng.integers(40, 100), DIM)).astype(np.float32)
+            x[:, 1 + ci] += 1.5
+            tumor = np.zeros(len(x), dtype=bool)
+            if y:
+                tumor[rng.choice(len(x), max(len(x) // 10, 3), replace=False)] = True
+                x[tumor, 0] += 4.0
+            bags[sid], labels[sid] = x, np.where(tumor, "tumor", "normal")
+            rows.append({**manifest_row, "slide_id": sid, "dataset": ds, "center": c, "patient_pseudo_id": f"p{sid}",
+                         "reference_diagnosis": ["negative", "macro"][y], "label": y, "exhaustive_annot": True})
+    return pd.DataFrame(rows), bags, labels
+
+
+def test_temperature_recovers_the_scale_of_overconfident_logits():
+    rng = np.random.default_rng(0)
+    logits = rng.normal(0, 6, 20000)
+    y = rng.random(len(logits)) < sigmoid(logits / 3.0)
+    assert fit_temperature(logits, y) == pytest.approx(3.0, rel=0.08)
+
+
+def test_center_probe_and_robustness_index_see_a_centre_effect():
+    rng = np.random.default_rng(0)
+    center = np.repeat(np.array(["a", "b", "c"]), 40)
+    patient = np.arange(len(center)).astype(str)
+    noise = rng.normal(size=(len(center), 8))
+    shifted = noise + (center[:, None] == np.array(["a", "b", "c"])) @ np.eye(3, 8) * 3
+    assert center_probe(shifted, center, patient, seed=0) > 0.95
+    assert 0.3 < center_probe(noise, center, patient, seed=0) < 0.7
+    # tiles cluster by class only: every neighbour has the same class, from any centre -> RI >> 1
+    tumor = np.tile([True, False], 60)
+    h = noise + tumor[:, None] * 10
+    biology = robustness_index(h, tumor, np.arange(len(h)) // 4, center)
+    assert biology["ri"] > 10
+    # tiles cluster by centre only -> RI < 1
+    by_center = robustness_index(shifted * 5, tumor, np.arange(len(h)) // 4, center)
+    assert by_center["ri"] < 1 and by_center["same_center_fraction"] > 0.9
+
+
+def test_head_protocol_runs_loco_on_every_centre_and_calibrates_without_it(manifest_row):
+    manifest, bags, labels = synthetic_cohort(manifest_row)
+    spec = HeadSpec(**{**SPEC, "datasets": ["d1", "d2"]})
+    cohort, _ = assemble(spec, {d: manifest[manifest.dataset == d] for d in ("d1", "d2")})
+    table = assign_folds(cohort, 3, seed=0).merge(manifest[["slide_id", "exhaustive_annot"]], on="slide_id")
+    with pytest.raises(ValueError, match="external"):
+        run_head_protocol(table, bags, labels.get, MIL, seed=0, inner_folds=2)
+    dev = table[table.role == "dev"].reset_index(drop=True)
+    out = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2)
+    m = out["metrics"]
+    assert set(m["loco"]) == {f"held-out {c}" for c in "abcd"} and "z" not in set(out["predictions"].center)
+    assert set(m["temperature"]) == {"global", *m["loco"]} and all(t > 0 for t in m["temperature"].values())
+    assert m["cv"]["auroc"] > 0.9 and m["loco_worst_auroc"] is not None
+    assert m["cv"]["auroc"] == m["cv_raw"]["auroc"]                      # a temperature never reorders
+    loco = out["predictions"][out["predictions"].group == "loco"]
+    assert ((loco.p >= 0.5) == (loco.p_raw >= 0.5)).all()               # nor moves the 0.5 decision
+    mean, _ = across_seeds([m, m])                                      # domain keys survive the averaging
+    assert mean["loco_by_domain"]["held-out a"]["d1:a"]["n"] == m["loco_by_domain"]["held-out a"]["d1:a"]["n"] > 0
+    rob = m["robustness"]
+    assert rob["center_probe_auroc"] > 0.8 and rob["robustness_index"] is not None
+    assert (pd.DataFrame(out["runs"]).group == "loco-calibration").sum() == 8   # 4 centres x 2 inner folds
+    verdict = head_gate(m, len(dev), HeadSpec(**SPEC).gate)
+    assert verdict["status"] in ("passed", "failed") and all(isinstance(r, str) for r in verdict["reasons"])
+
+
+def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path, monkeypatch, manifest_row):
+    manifest, bags, labels = synthetic_cohort(manifest_row, n_per_center=10)
+    cfgs = {}
+    for ds in ("d1", "d2"):
+        manifest[manifest.dataset == ds].to_csv(tmp_path / f"{ds}.csv", index=False)
+        root = tmp_path / ds / "embeddings/dummy"
+        root.mkdir(parents=True)
+        ident = {"backbone": "dummy", "version": "seed0", "dim": DIM, "collection": "dummy__seed0"}
+        write_json(root / "collection.json", ident)
+        for sid in manifest[manifest.dataset == ds].slide_id:
+            if sid != "c00":                                   # one slide not extracted yet
+                store.write_slide(root, sid, bags[sid], pd.DataFrame({"label": labels[sid]}), ident)
+        cfgs[ds] = OmegaConf.create({"manifest": str(tmp_path / f"{ds}.csv"), "out": str(tmp_path / ds)})
+    for module in ("tumordetector.tasks.cohort", "tumordetector.tasks.train_head"):
+        monkeypatch.setattr(f"{module}.dataset_cfg", cfgs.__getitem__)
+    loaded = []
+    real_load = np.load
+    monkeypatch.setattr(np, "load", lambda p, *a, **k: loaded.append(Path(p).stem) or real_load(p, *a, **k))
+
+    monkeypatch.chdir(tmp_path)
+    uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
+    head = ["head.datasets=[d1,d2]", "head.roles.external.center=[z]", "head.calibration.inner_folds=2",
+            f"paths.heads={tmp_path / 'heads'}"]
+    cli.main(["task=cohort", *head, "mil.folds=3"])
+    cli.main(["task=train_head", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}", f"mlflow.tracking_uri={uri}",
+              "mil.epochs=6", "mil.hidden=32", "mil.lr=0.002", "mil.seeds=[0]", "mil.workers=1"])
+
+    assert not [s for s in loaded if s.startswith("z")]           # the locked external test is never read
+    rep = tmp_path / "out/reports/dummy/heads/ln_metastasis"
+    text = (rep / "report.md").read_text()
+    assert "DATI INSUFFICIENTI" in text and "held-out d" in text and "Robustness Index" in text
+    assert pd.read_csv(rep / "excluded.csv").slide_id.tolist() == ["c00"]
+    assert read_json(rep / "calibration.json")["temperature"] > 0
+    client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
+    version = client.get_model_version_by_alias("head-ln_metastasis-dummy", "candidate")
+    assert version.tags["head_version"] == "1" and float(version.tags["temperature"]) > 0
+
+    # a relabelled manifest no longer matches the cohort: training refuses
+    manifest.assign(reference_diagnosis="negative").pipe(lambda m: m[m.dataset == "d1"]).to_csv(
+        tmp_path / "d1.csv", index=False)
+    with pytest.raises(SystemExit, match="no longer matches"):
+        cli.main(["task=train_head", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}"])

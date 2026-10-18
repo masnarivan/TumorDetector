@@ -1,7 +1,9 @@
 # Training multi-centro e teste per tessuto — progetto
 
 Stato: **progetto approvato nelle scelte principali**, 18/10/2026. Implementati: manifest (paziente
-unificato, `file_format`), specifica della testa e cohort con ruoli e fold (`td task=cohort`). I
+unificato, `file_format`), specifica della testa e cohort con ruoli e fold (`td task=cohort`),
+training della testa senza mitigazioni con temperatura globale, probe e Robustness Index nel gate
+(`td task=train_head`, protocollo di E6). Mancano le mitigazioni (E7) e il task del test esterno. I
 protocolli degli esperimenti (E6, E7) passano in [esperimenti.md](esperimenti.md) prima di vedere i
 risultati, con le soglie di adozione.
 
@@ -124,7 +126,7 @@ Oggi `train` legge un dataset e una cartella di embedding. Il nuovo `cohort`:
 - carica gli embedding dalla cartella di ogni dataset (`data/embeddings/<backbone>`,
   `data/camelyon17/embeddings/<backbone>`) e **rifiuta di partire se le `collection.json` non hanno la
   stessa versione del backbone**: embedding di versioni diverse non si mescolano mai;
-- aggiunge la colonna `domain` (per la testa linfonodo: `camelyon16/radboud`, `camelyon17/radboud`,
+- aggiunge la colonna `domain` (per la testa linfonodo: `camelyon16:radboud`, `camelyon17:radboud`,
   ...), che non coincide con `center`.
 
 Perché `domain` distinto da `center`: Radboud in CAMELYON16 e in CAMELYON17 sono preparati in anni

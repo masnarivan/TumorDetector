@@ -35,6 +35,8 @@ UNTRACKED = {
     "mil.register": "model registry, outside the stage's outputs",
     "mil.report_dir": "for experiments, which write outside the stage's outputs",
     "mil.overwrite_splits": "read by task=splits only",
+    "head.overwrite": "read by task=cohort only",
+    "paths.heads": "where the cohort files are: the stage's deps",
 }
 # Stages whose input is not on disk (slides downloaded and deleted): DVC must never delete their outputs.
 REMOTE_INPUT = {"stream"}
@@ -185,7 +187,8 @@ def test_stage_params_are_the_config_it_reads(name, cfg):
     params = set()
     for item in stage.get("params", []):
         for file, keys in item.items():
-            prefix = "data." if file == "conf/data/camelyon16.yaml" else ""
+            prefix = ("data." if file == "conf/data/camelyon16.yaml"
+                      else "head." if file.startswith("conf/head/") else "")
             params |= {prefix + k for k in keys}
     task = task_of(stage)
     reads = config_reads(used_code(task, closure(task)), cfg)

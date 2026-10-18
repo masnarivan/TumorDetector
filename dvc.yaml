@@ -4,9 +4,11 @@
 #   stream  -> data/tiles, data/qc, data/embeddings/<backbone>   the whole manifest, slide by slide
 #   index   -> Qdrant (regions + k-center prototypes per slide) + data/index/<backbone>.json
 #   baseline-> data/reports/<backbone>/abmil
+#   head-ln_metastasis -> data/reports/<backbone>/heads/ln_metastasis   CAMELYON16 + 17, its cohort file
 #
 # Not stages:
-#   - manifest and splits (`td task=manifest`, `td task=splits`): rebuilt on purpose, versioned in git;
+#   - manifest, splits and head cohorts (`td task=manifest`, `splits`, `cohort`): rebuilt on purpose,
+#     versioned in git;
 #   - `td task=tile` and `td task=embed`: development on the few slides on this machine. They need the
 #     .tif, which `stream` deletes, so as stages they could not rebuild what they would overwrite.
 #     They write into the same folders as `stream`, with the same rules: run `td task=verify` before
@@ -111,4 +113,60 @@ stages:
           cache: false        # small and worth reading in a diff: versioned in git
     metrics:
       - data/reports/${backbone}/abmil/metrics.json:
+          cache: false
+
+  head-ln_metastasis:
+    # CAMELYON17 embeddings come from `td task=stream data=camelyon17` (not a stage yet); the locked
+    # external slides (LPON) are in the folder but never read by this task.
+    cmd: td task=train_head backbone=${backbone} head=ln_metastasis
+    deps:
+      - data/embeddings/${backbone}
+      - data/camelyon17/embeddings/${backbone}
+      - data/manifests/camelyon16.csv
+      - data/manifests/camelyon17.csv
+      - data/manifests/heads/ln_metastasis.csv
+      - src/tumordetector/tasks/train_head.py
+      - src/tumordetector/config.py
+      - src/tumordetector/io.py
+      - src/tumordetector/embed/store.py
+      - src/tumordetector/heads
+      - src/tumordetector/mil
+    params:
+      - conf/config.yaml:
+          - mil.hidden
+          - mil.dropout
+          - mil.lr
+          - mil.weight_decay
+          - mil.epochs
+          - mil.max_tiles
+          - mil.threshold
+          - mil.folds
+          - mil.device
+          - mil.seeds
+          - mil.threads
+          - mil.normalize
+      - conf/head/ln_metastasis.yaml:
+          - id
+          - version
+          - module
+          - task
+          - sites
+          - datasets
+          - labels
+          - domain
+          - roles
+          - calibration
+          - gate
+    outs:
+      - data/reports/${backbone}/heads/ln_metastasis/model.pt
+      - data/reports/${backbone}/heads/ln_metastasis/predictions.csv
+      - data/reports/${backbone}/heads/ln_metastasis/attention.csv
+      - data/reports/${backbone}/heads/ln_metastasis/excluded.csv:
+          cache: false
+      - data/reports/${backbone}/heads/ln_metastasis/calibration.json:
+          cache: false        # the temperature that goes with model.pt: small, read in a diff
+      - data/reports/${backbone}/heads/ln_metastasis/report.md:
+          cache: false
+    metrics:
+      - data/reports/${backbone}/heads/ln_metastasis/metrics.json:
           cache: false

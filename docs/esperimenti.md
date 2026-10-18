@@ -13,6 +13,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E4 | Baseline con embedding normalizzati per vetrino | fatto: non adottata | se adottare la normalizzazione nel modello |
 | E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
 | C17 | Controlli su CAMELYON17: annotazioni, metadati, sovrapposizione con CAMELYON16 | fatto | se le etichette e gli split di CAMELYON17 sono usabili |
+| E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | protocollo fissato | se più centri bastano; riferimento per le mitigazioni (E7) |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -657,3 +658,72 @@ con un "dominio" diverso dagli altri 243 di Radboud.
    E3b, tranne che per LPON (data di scansione).
 5. LPON ha 5 scanner diversi: un sottogruppo naturale per verificare la robustezza allo scanner.
 6. `normal_144` va segnato nel manifest come vetrino con conversione diversa.
+
+## E6 — Più centri, nessuna mitigazione
+
+Protocollo fissato il 18/10/2026, prima di ogni addestramento sul cohort. Progetto in
+[training-multicentro.md](training-multicentro.md).
+
+**Domanda.** Addestrato su quattro centri (sei domini) invece di due, senza alcuna mitigazione e con
+una sola temperatura globale, l'ABMIL regge su un centro mai visto? Di quanto migliora, sul centro
+comune, rispetto al training su CAMELYON16? È il riferimento contro cui E7 giudica le mitigazioni.
+
+**Dati.** Cohort `ln_metastasis` v1 (`data/manifests/heads/ln_metastasis.csv`): 771 vetrini di
+sviluppo, CAMELYON16 (train e test ufficiale) e CAMELYON17 di Radboud, Utrecht, CWZ e Rijnstate; ITC
+escluse. **I 92 vetrini LPON non vengono letti** (test esterno bloccato). Phikon `057cc0295895`.
+
+**Modello.** ABMIL come il baseline, con gli iperparametri di `conf/config.yaml` (`mil`: hidden 256,
+dropout 0,25, lr 2e-4, weight decay 1e-4, 30 epoche, 4096 tile per passo, nessuna normalizzazione),
+`pos_weight` globale, nessuna mitigazione. Tre semi (0, 1, 2), un thread.
+
+**Protocollo** (`td task=train_head head=ln_metastasis`).
+
+1. Cross-validation sui 5 fold del cohort (raggruppati per paziente, stratificati per etichetta ×
+   dominio).
+2. Temperatura globale *T*: minimizza la log-verosimiglianza negativa delle logit fuori fold della
+   CV, *T* in [0,05; 20]. Probabilità calibrata = sigmoide(logit / *T*). La soglia 0,5 non cambia
+   con *T*: sensibilità e specificità sono le stesse prima e dopo.
+3. Leave-one-centre-out sui 4 centri (un centro escluso per intero, entrambi i dataset). Per ogni
+   rotazione la temperatura si stima **solo con i centri di training**: 3 fold interni
+   (`cv_fold mod 3`), le loro logit fuori fold, la stessa procedura del punto 2. Il centro escluso non
+   contribuisce mai alla sua temperatura.
+4. Modello finale su tutto lo sviluppo, con la temperatura del punto 2.
+5. Robustezza al centro, sul modello finale:
+   - probe sul centro: regressione logistica multinomiale (feature standardizzate) dalla
+     rappresentazione pooled *z* della testa al centro; 5 fold raggruppati per paziente e
+     stratificati per centro; AUROC macro one-vs-rest fuori fold. **Primario sui soli vetrini
+     negativi** (togli la differenza di composizione, come in E2); secondario su tutti;
+   - Robustness Index sulle rappresentazioni *h* delle tile (dopo il primo strato della testa): fino
+     a 100 tile tumorali e 100 normali per vetrino, dai vetrini negativi e da quelli con annotazione
+     completa; 10 vicini per coseno da altri vetrini; RI = vicini con stessa classe e altro centro /
+     vicini con altra classe e stesso centro (definizione di E2).
+
+**Esiti** (media sui tre semi, valori di ogni seme nel report).
+
+- La batteria del gate della testa (`conf/head/ln_metastasis.yaml`): AUROC in CV ≥ 0,90; AUROC
+  peggiore in leave-one-centre-out ≥ 0,85; ECE calibrata in CV ≤ 0,10; **ECE calibrata peggiore in
+  leave-one-centre-out ≤ 0,10**; specificità peggiore in leave-one-centre-out ≥ 0,80; AUROC del probe
+  sul centro (negativi) ≤ 0,80; Robustness Index ≥ 0,5.
+- Effetto della temperatura: ECE peggiore in leave-one-centre-out grezza e calibrata.
+- Confronto con CAMELYON16 sul centro comune: ECE e specificità con Utrecht escluso, calcolate sui
+  soli vetrini Utrecht di CAMELYON16, contro E4 `none` (stesso codice di training, tre semi, un
+  thread: ECE 0,146, specificità 0,864). Il baseline registrato non si usa (sei thread, E4).
+- Secondari: metriche per centro e per dominio in CV, AUROC dell'attenzione, temperature stimate.
+
+**Lettura** (fissata ora).
+
+- E6 è il riferimento di E7 qualunque sia l'esito.
+- "Più centri aiutano" se, sui vetrini Utrecht di CAMELYON16 con Utrecht escluso, l'ECE calibrata
+  scende di almeno 0,05 sotto 0,146 e la specificità non scende sotto 0,864 − 0,02.
+- Se E6 supera tutta la batteria, E7 si fa comunque, ma una mitigazione si adotta solo se migliora
+  il probe o il Robustness Index senza peggiorare le voci del gate oltre i margini che E7 fisserà.
+- Riferimenti per leggere la robustezza: sugli embedding grezzi Phikon probe 1,000 e RI 0,09 (E2).
+  Un probe sopra 0,80 in E6 è atteso e non invalida le altre misure.
+
+**Limiti.** Il test ufficiale di CAMELYON16 sta nello sviluppo: non c'è un test in distribuzione
+separato, la CV ne fa le veci. Una sovrapposizione di pazienti tra CAMELYON16 e 17 (Radboud, Utrecht)
+non è verificabile (C17 §3): può gonfiare la CV, non il leave-one-centre-out. Un backbone; il punto
+cieco della griglia resta (C17 §1). La temperatura è un solo parametro: corregge la scala, non uno
+spostamento diverso per classe. La CV calibrata è ottimista (la temperatura è stimata sulle stesse
+predizioni): il gate la usa, ma la misura che conta è quella in leave-one-centre-out.
+
