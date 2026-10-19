@@ -237,13 +237,19 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
     }
 
 
-def head_gate(metrics: dict, n_slides: int, gate) -> dict:
-    """Promotion verdict of a head: 'passed', 'failed' or 'insufficient_data', with reasons in Italian."""
+def head_gate(metrics: dict, n_slides: int, gate, previous_probe: float | None = None) -> dict:
+    """Promotion verdict of a head: 'passed', 'failed' or 'insufficient_data', with reasons in Italian.
+
+    The centre probe has a threshold only if `gate.max_center_probe_auroc` is set (after E8 it is not:
+    it stays near 1 whatever the recipe). It is still checked against `previous_probe`, the probe of the
+    model version that holds the 'validated' alias: a candidate must not make the centre more readable
+    by more than `gate.max_probe_regression`. `notes` are informative lines, not reasons to fail."""
     if n_slides < gate.min_slides:
-        return {"status": "insufficient_data",
+        return {"status": "insufficient_data", "notes": [],
                 "reasons": [f"{n_slides} vetrini, ne servono almeno {gate.min_slides}: "
                             "questa esecuzione verifica solo che il codice funzioni"]}
     rob = metrics.get("robustness", {})
+    probe = rob.get("center_probe_auroc")
     checks = [
         ("AUROC in cross-validation", metrics["cv"].get("auroc"), ">=", gate.min_cv_auroc),
         ("AUROC peggiore in leave-one-center-out", metrics["loco_worst_auroc"], ">=", gate.min_loco_worst_auroc),
@@ -251,14 +257,23 @@ def head_gate(metrics: dict, n_slides: int, gate) -> dict:
         ("ECE calibrata peggiore in leave-one-center-out", metrics["loco_worst_ece"], "<=", gate.max_loco_ece),
         ("Specificità peggiore in leave-one-center-out", metrics["loco_worst_specificity"], ">=",
          gate.min_loco_specificity),
-        ("AUROC del probe sul centro (vetrini negativi)", rob.get("center_probe_auroc"), "<=",
-         gate.max_center_probe_auroc),
         ("Robustness Index", rob.get("robustness_index"), ">=", gate.min_robustness_index),
     ]
+    notes = []
+    if gate.max_center_probe_auroc is not None:
+        checks.append(("AUROC del probe sul centro (vetrini negativi)", probe, "<=", gate.max_center_probe_auroc))
+    else:
+        notes.append(f"Probe sul centro {'n/d' if probe is None else f'{probe:.3f}'}: riportato, senza soglia")
+    if gate.max_probe_regression is not None:
+        if previous_probe is None:
+            notes.append("Non regressione del probe: nessun modello validato con cui confrontare")
+        else:
+            checks.append(("AUROC del probe sul centro rispetto al modello validato", probe, "<=",
+                           round(previous_probe + gate.max_probe_regression, 6)))
     reasons = []
     for name, value, op, limit in checks:
         if value is None:
             reasons.append(f"{name}: non misurabile")
         elif (value < limit) if op == ">=" else (value > limit):
             reasons.append(f"{name} {value:.3f}, richiesto {op} {limit}")
-    return {"status": "failed" if reasons else "passed", "reasons": reasons}
+    return {"status": "failed" if reasons else "passed", "reasons": reasons, "notes": notes}

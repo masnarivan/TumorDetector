@@ -29,8 +29,11 @@ class Gate(BaseModel):
     max_ece: float
     max_loco_ece: float
     min_loco_specificity: float
-    max_center_probe_auroc: float      # linear probe of the centre from the head's slide representation
     min_robustness_index: float        # neighbours of the same class elsewhere vs other class here
+    # Linear probe of the centre from the head's slide representation: None = reported, no threshold
+    # (after E8). It must not exceed the 'validated' version's probe by more than max_probe_regression.
+    max_center_probe_auroc: float | None = None
+    max_probe_regression: float | None = 0.01
 
 
 class HeadSpec(BaseModel):
@@ -45,7 +48,8 @@ class HeadSpec(BaseModel):
     labels: dict[str, int] = Field(min_length=1)
     domain: list[str] = Field(min_length=1)
     roles: dict[Literal["external"], dict[str, list[str]]] = {}
-    recipe: list[Literal["balanced", "group_dro", "stat_mix"]] = []   # heads/mitigations.py; empty = E6
+    recipe: list[Literal["balanced", "group_dro", "stat_mix", "adversarial", "adversarial_negatives"]] = []
+    # ^ mitigations, heads/mitigations.py; empty = the training of E6
     calibration: Calibration = Calibration()
     gate: Gate
     overwrite: bool = False

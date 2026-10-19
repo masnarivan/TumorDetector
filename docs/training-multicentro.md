@@ -16,7 +16,7 @@ risultati, con le soglie di adozione.
 | Teste future | Ricetta di mitigazione dentro ogni testa; nessun adapter condiviso per ora |
 | Gruppi | Bilanciamento e DRO sui **domini** (dataset × centro); leave-one-centre-out per centro intero |
 | Calibrazione | **Solo globale**: il modello deve reggere su un centro nuovo senza vetrini di quel centro. Nessuna ricalibrazione per centro all'installazione |
-| Robustezza nel gate | Soglie subito, primo gradino permissivo: probe sul centro ≤ 0,80, Robustness Index ≥ 0,5; da stringere dopo E7 |
+| Robustezza nel gate | Robustness Index ≥ 0,5. Probe sul centro: soglia ≤ 0,80 fino a E8, poi (19/10) solo riportato, con la regola di non superare il probe del modello `validated` di oltre 0,01 |
 | Test esterno | Bloccato dal codice: una consultazione per versione, solo versioni `validated` |
 | Punto cieco della griglia | Non prioritario: griglia invariata, i vetrini noti riportati come sottogruppo |
 
@@ -168,8 +168,9 @@ mitigazione è un modulo piccolo con i suoi iperparametri in `conf/mitigation/<n
 | `group_dro` | Minimizza la perdita del dominio peggiore (Sagawa et al., 2020, versione online: un peso per dominio aggiornato a ogni passo, va bene con un vetrino per passo) | Basso | Il gate guarda il centro peggiore: allineare l'obiettivo al criterio |
 | `stat_mix` | Aumentazione nello spazio degli embedding: per un vetrino si sostituiscono media e deviazione standard delle sue tile con una miscela di quelle di un vetrino di un altro dominio (MixStyle / DSU sulle statistiche per vetrino) | Basso | E2: dopo aver tolto la media il centro resta nella struttura locale (varianza): la media da sola non basta, media + varianza forse sì. A differenza di E4 non cambia l'inferenza |
 
-Non in questa tornata: discriminatore avversariale del dominio (DANN: instabile, un iperparametro in
-più da tarare; si riprende solo se le tre sopra non portano il probe sotto soglia); aumentazione di colore sulle immagini (richiede una seconda estrazione su
+Non in E7: discriminatore avversariale del dominio (DANN: instabile, un iperparametro in più da
+tarare). Implementato il 18/10/2026 come ricetta `adversarial` (discriminatori su *z* e sulle *h*
+delle tile, inversione del gradiente con la rampa di Ganin), da usare solo con un protocollo suo; aumentazione di colore sulle immagini (richiede una seconda estrazione su
 Colab per ogni vista: da valutare con H-optimus-0 solo se le mitigazioni sugli embedding non
 bastano); supervisione delle tile con le annotazioni (utile per la localizzazione, non per il centro).
 

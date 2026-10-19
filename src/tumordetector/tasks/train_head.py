@@ -78,8 +78,14 @@ def run(cfg: DictConfig):
     result = {**runs[0], "metrics": metrics, "spread": spread, "seeds": seeds, "excluded": excluded,
               "predictions": pd.concat([r["predictions"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)]),
               "attention": pd.concat([r["attention"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)])}
-    verdict = head_gate(metrics, result["n_dev"], spec.gate)
     model_name = f"head-{spec.id}-{cfg.backbone.name}"
+    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
+    try:   # the probe of the version currently validated, for the non-regression rule
+        validated = mlflow.MlflowClient().get_model_version_by_alias(model_name, "validated")
+        previous_probe = float(validated.tags["center_probe_auroc"])
+    except (mlflow.exceptions.MlflowException, KeyError, ValueError):
+        previous_probe = None
+    verdict = head_gate(metrics, result["n_dev"], spec.gate, previous_probe)
     cohort_sha = hashlib.sha256(path.read_bytes()).hexdigest()
     hyper = {k: cfg.mil[k] for k in ("hidden", "dropout", "lr", "weight_decay", "epochs", "max_tiles", "threshold",
                                      "normalize", "threads")}
@@ -105,7 +111,6 @@ def run(cfg: DictConfig):
     result["attention"].to_csv(rep / "attention.csv", index=False)
     excluded.to_csv(rep / "excluded.csv", index=False)
 
-    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     mlflow.set_experiment(f"head-{spec.id}")
     with mlflow.start_run(run_name=model_name):
         mlflow.log_params({"backbone": cfg.backbone.name, "backbone_version": ident["version"],
@@ -139,6 +144,7 @@ def run(cfg: DictConfig):
             tags = {"validation_status": verdict["status"], "collection": ident["collection"],
                     "head_version": spec.version, "cohort_sha256": cohort_sha,
                     "recipe": ",".join(spec.recipe) or "none",
+                    "center_probe_auroc": metrics.get("robustness", {}).get("center_probe_auroc"),
                     "temperature": calibration["temperature"]}
             for k, v in tags.items():
                 client.set_model_version_tag(model_name, version, k, str(v))

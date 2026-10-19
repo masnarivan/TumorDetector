@@ -14,7 +14,8 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E5 | Compressione dei vettori nel vector DB: int8 e PCA | misurato: per ora non serve | come fare spazio su Qdrant quando servirà |
 | C17 | Controlli su CAMELYON17: annotazioni, metadati, sovrapposizione con CAMELYON16 | fatto | se le etichette e gli split di CAMELYON17 sono usabili |
 | E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | fatto: gate non superato, i normali di un centro nuovo salgono | se più centri bastano; riferimento per le mitigazioni (E7) |
-| E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | protocollo fissato | quale ricetta di training adottare per le teste |
+| E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | fatto: nessuna adottata, l'errore si sposta tra centri | quale ricetta di training adottare per le teste |
+| E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -858,4 +859,180 @@ patologi, guardando calibrazione e specificità sul centro escluso, non il probe
 **Limiti.** Tre semi: in E4 la variabilità tra semi dell'ECE peggiore era dell'ordine di 0,07, più
 grande del margine di 0,03. Il report riporta il valore di ogni seme e l'esito va letto con quella
 incertezza. Un solo backbone (Phikon): la ricetta va rivalidata con H-optimus-0.
+
+**Risultati** (18–19/10/2026, codice `b350cfd`, `experiments/e7_run.sh`: circa 4 ore per variante, tre
+semi in parallelo; report in `data/reports/experiments/e7/`, confronto in
+`data/reports/experiments/e7/summary.md` scritto da `experiments/e7_compare.py`, fissato prima dei
+risultati). Eseguito come da protocollo; nessun modello registrato.
+
+| Metrica (media sui semi) | E6 | balanced | + group DRO | + stat_mix |
+|---|---|---|---|---|
+| **ECE calibrata peggiore LOCO** (primario, −0,03) | 0,293 | 0,313 (+0,020) | 0,277 (−0,016) | 0,296 (+0,003) |
+| **Probe sul centro, negativi** (primario, −0,10) | 0,999 | 0,995 | 0,995 | 0,994 |
+| AUROC peggiore LOCO (vincolo, −0,01) | 0,974 | 0,967 | 0,970 | **0,959 (−0,015)** |
+| AUROC CV (vincolo, −0,01) | 0,989 | 0,985 | 0,988 | 0,986 |
+| Specificità peggiore LOCO (vincolo, −0,02) | 0,430 | 0,485 | 0,541 | 0,530 |
+| AUROC attenzione (vincolo, −0,02) | 0,988 | 0,988 | 0,989 | 0,989 |
+| Robustness Index | 2,65 | 2,70 | 2,94 | 2,90 |
+| Specificità, Utrecht escluso | 0,492 | 0,490 | **0,713** | 0,530 |
+| Specificità, CWZ escluso | 0,770 | 0,759 | **0,569** | **0,920** |
+| Gate | non superato | non superato | non superato | non superato |
+
+**Esito secondo il criterio: nessuna variante adottata, si tiene la ricetta vuota.** Nessuna raggiunge
+un primario; `stat_mix` viola anche il vincolo sull'AUROC peggiore in leave-one-centre-out (−0,015).
+Il probe resta a 0,99 per tutte: come previsto da E6, il gate sul probe non è avvicinabile con queste
+ricette.
+
+**Analisi a posteriori** (ipotesi). Mediana delle logit dei vetrini **negativi** del centro escluso
+(in CV, centro visto, tutte le varianti stanno fra −6,3 e −8,0):
+
+| | CWZ escluso | Utrecht escluso |
+|---|---|---|
+| E6 | −2,7 | +0,1 |
+| balanced | −3,4 | +0,1 |
+| + group DRO | −0,7 | **−2,0** |
+| + stat_mix | **−3,7** | −0,1 |
+
+- **L'errore si sposta tra centri invece di sparire**, come in E4. Group DRO aiuta Utrecht
+  (specificità +0,22) e peggiora CWZ (−0,20); la specificità peggiore sale solo perché il peggiore
+  cambia centro.
+- **stat_mix aiuta il centro dello stesso scanner, non quello di scanner diverso.** CWZ (3DHistech
+  come i centri di training) passa da 0,77 a 0,92 di specificità; Utrecht (Hamamatsu) resta a 0,53.
+  Coerente con E2: media e varianza per vetrino non bastano, la differenza di scanner sta anche nella
+  struttura locale.
+- Nessuna ricetta riporta i negativi di Utrecht vicino a quelli visti in training (−2,0 nel migliore
+  dei casi, contro circa −7).
+
+**Conseguenze.**
+
+1. Con le ricette di E7 il problema di E6 resta: lo spostamento dei negativi su uno scanner mai visto.
+2. Restano due strade, da decidere: il discriminatore avversariale (DANN, implementato come ricetta
+   `adversarial`, da usare con un protocollo suo), che agisce sulla struttura della rappresentazione e
+   non solo sulle statistiche, e la correzione dell'offset con pochi vetrini negativi del centro nuovo,
+   che risponde direttamente allo spostamento osservato ma richiede di rivedere la decisione "solo
+   calibrazione globale".
+3. Il gate sul probe (≤ 0,80) è fuori portata per tutte le ricette senza un vincolo esplicito sulla
+   rappresentazione; va ridiscusso insieme alla strada scelta.
+
+## E8 — Discriminatore avversariale del dominio (DANN)
+
+Protocollo fissato il 19/10/2026, dopo E7 e prima di ogni addestramento con le ricette avversariali
+sui dati reali (una prova da 1 epoca e 1 seme, solo per verificare che il codice giri, si fa dopo
+questo protocollo e non entra nei risultati). Riferimento: E6 (in E7 nessuna ricetta è stata adottata).
+
+**Domanda.** Se la testa viene addestrata a rendere la sua rappresentazione inutile per riconoscere il
+dominio, i vetrini negativi di un centro mai visto restano vicini ai negativi del training, invece di
+salire verso il tumore come in E6 ed E7?
+
+**Perché ora.** E7 ha mostrato che pesare i domini (bilanciamento, group DRO) sposta l'errore da un
+centro all'altro, e che mescolare media e varianza per vetrino aiuta il centro con lo stesso scanner
+(CWZ) ma non quello con uno scanner diverso (Utrecht). Il discriminatore agisce su tutta la struttura
+della rappresentazione che un classificatore non lineare sa leggere, non solo sulle statistiche.
+
+**Disegno.** Due varianti, ognuna contro E6, stesso codice di E6/E7 e stessi tre semi:
+
+1. `balanced + adversarial`: due discriminatori del dominio (dataset × centro), uno sulla
+   rappresentazione del vetrino *z* e uno su 256 tile campionate a ogni passo dalla loro
+   rappresentazione *h*; MLP con uno strato nascosto da 128; entropia incrociata pesata per dominio
+   (inverso della frequenza dei domini nel training); collegati alla testa con l'inversione del
+   gradiente, forza λ(p) = 2 / (1 + e^(−10 p)) − 1 con p = avanzamento del training da 0 a 1 (Ganin et
+   al., 2016), fino a 1. Stesso ottimizzatore (AdamW, stesso learning rate) per testa e
+   discriminatori. I discriminatori sono scartati alla fine: il modello è l'ABMIL di sempre.
+2. `balanced + adversarial_negatives`: lo stesso, ma la perdita avversariale si calcola **solo sui
+   vetrini negativi** (pesi per dominio contati sui negativi). È lo spostamento osservato in E6 (solo i
+   negativi salgono), e lascia stare il segnale del tumore.
+
+`balanced` è in entrambe perché la prevalenza del tumore cambia tra domini: senza bilanciamento il
+discriminatore potrebbe riconoscere il dominio dalla quota di tumore. Gli iperparametri sono i valori
+dell'articolo, **non tarati**, per la stessa ragione di E7.
+
+**Esiti** (media sui tre semi, differenza da E6).
+
+- Primari: ECE calibrata peggiore in leave-one-centre-out; specificità peggiore in leave-one-centre-out.
+- Vincoli: AUROC peggiore in leave-one-centre-out, AUROC in CV, AUROC dell'attenzione, e la
+  **specificità di ogni centro escluso** (perché il peggiore non può migliorare solo cambiando centro).
+- Secondari: probe sul centro (negativi), Robustness Index, mediana delle logit dei negativi di
+  ciascun centro escluso (la misura di E6), metriche per dominio, temperature.
+
+Il probe passa da primario (E7) a secondario: le ricette avversariali ottimizzano proprio la leggibilità
+del centro in *z*, quindi il probe può scendere senza che cambi nulla sul centro escluso. Resta voce del
+gate e si riporta.
+
+**Criterio di adozione** (fissato ora). Una variante è adottata se raggiunge almeno un primario — ECE
+calibrata peggiore in leave-one-centre-out **−0,03** o più, oppure specificità peggiore in
+leave-one-centre-out **+0,10** o più — e rispetta tutti i vincoli: AUROC peggiore in leave-one-centre-out
+e AUROC in CV non scendono più di 0,01; AUROC dell'attenzione non scende più di 0,02; **la specificità di
+nessun centro escluso scende più di 0,05**. Se entrambe sono adottabili si sceglie quella che supera il
+gate; a parità, la 2 (agisce solo dove E6 ha visto il problema, toglie meno segnale). Nessuna combinazione
+con group DRO o stat_mix in questo esperimento.
+
+**Se nessuna è adottata**, si tiene la ricetta vuota e il passo successivo è la correzione dell'offset
+con pochi vetrini negativi del centro nuovo, che richiede di rivedere con i patologi la decisione "solo
+calibrazione globale".
+
+**Limiti.** Tre semi, con la variabilità di E6–E7 (specificità di Utrecht da 0,09 a 0,82 tra semi):
+il margine di 0,10 sulla specificità è dell'ordine di quella variabilità, e il report riporta ogni
+seme. Nella rotazione "Utrecht escluso" il training contiene solo vetrini 3DHistech: il discriminatore
+impara a cancellare le differenze fra centri 3DHistech, non necessariamente quella verso Hamamatsu; è
+proprio ciò che il leave-one-centre-out misura. Un backbone; λ non tarato.
+
+**Risultati** (19/10/2026, codice `b350cfd` più le modifiche non committate della DANN, registrato nei
+report come `b350cfd+dirty`; un primo lancio è stato interrotto da un riavvio e rifatto da capo;
+circa 5 ore e 45 minuti la prima variante, 4 ore e 50 la seconda, con la CPU frenata da `kernel_task`;
+report in `data/reports/experiments/e8/`, confronto in `data/reports/experiments/e8/summary.md` da
+`experiments/e8_compare.py`, fissato prima dei risultati). Nessun modello registrato.
+
+| Metrica (media sui semi) | E6 | balanced + adversarial | balanced + adversarial_negatives |
+|---|---|---|---|
+| **ECE calibrata peggiore LOCO** (primario, −0,03) | 0,293 | 0,389 (+0,096) | 0,301 (+0,008) |
+| **Specificità peggiore LOCO** (primario, +0,10) | 0,430 | 0,383 (−0,048) | **0,561 (+0,131)** |
+| AUROC peggiore LOCO (vincolo, −0,01) | 0,974 | **0,962 (−0,012)** | **0,952 (−0,022)** |
+| AUROC CV (vincolo, −0,01) | 0,989 | 0,986 | 0,980 |
+| AUROC attenzione (vincolo, −0,02) | 0,988 | 0,992 | 0,990 |
+| Specificità, CWZ escluso (vincolo, −0,05) | 0,770 | **0,414 (−0,356)** | **0,718 (−0,052)** |
+| Specificità, Radboud escluso | 0,911 | 0,896 | 0,917 |
+| Specificità, Rijnstate escluso | 0,972 | 0,989 | 0,989 |
+| Specificità, Utrecht escluso | 0,492 (0,56; 0,09; 0,82) | **0,870 (0,87; 0,85; 0,89)** | 0,663 (0,52; 0,68; 0,79) |
+| Probe sul centro, negativi | 0,999 | 0,991 | 0,997 |
+| Robustness Index | 2,65 | 3,09 | 2,38 |
+| Logit mediana dei negativi, Utrecht escluso (CV: da −5 a −8) | +0,1 | −2,3 | −1,2 |
+| Logit mediana dei negativi, CWZ escluso | −2,7 | +1,2 | −3,0 |
+
+**Esito secondo il criterio: nessuna variante adottata, si tiene la ricetta vuota.**
+
+- `balanced + adversarial`: nessun primario; viola l'AUROC peggiore (−0,012) e soprattutto la
+  specificità di CWZ (−0,36, con un seme a 0,05).
+- `balanced + adversarial_negatives`: raggiunge un primario (specificità peggiore +0,131), ma viola
+  l'AUROC peggiore (−0,022) e, di poco, la specificità di CWZ (−0,052 contro un margine di 0,05).
+
+**Lettura** (oltre il criterio, quindi ipotesi).
+
+- **La DANN su tutti i vetrini corregge Utrecht, ed è stabile**: specificità 0,87 in tutti e tre i semi
+  (E6 da 0,09 a 0,82). È la prima ricetta che lo fa. In quella rotazione il training contiene solo
+  vetrini 3DHistech: un vincolo sulla rappresentazione basta per uno scanner mai visto, contro
+  l'ipotesi "è lo scanner, quindi serve vederlo".
+- **Ma lo schema di E4 ed E7 si ripete**: l'errore va su CWZ, con una variabilità enorme (0,97; 0,05;
+  0,22). Escludere CWZ lascia nel training due domini Utrecht (Hamamatsu) e due Radboud; cosa renda
+  CWZ instabile con la DANN non è chiaro dai dati.
+- **La variante sui soli negativi è un compromesso**: aiuta Utrecht meno (0,66), tiene quasi CWZ (0,72),
+  e porta la specificità peggiore a 0,56, il valore migliore di E6–E8. Paga 0,02 di AUROC sul centro
+  peggiore. È fuori dal criterio per poco su due vincoli: il criterio resta quello, e la variante non
+  è adottata.
+- **Le temperature salgono** (1,9–2,1 contro 1,7): con la DANN il modello è più sicuro di sé sui domini
+  visti, e la temperatura globale lo corregge solo in parte (ECE peggiore invariata o peggiore).
+- **Il probe resta a 0,99** anche con il discriminatore: la testa nasconde il dominio al discriminatore
+  non lineare durante il training, ma un probe lineare lo ritrova nel modello finale. Il Robustness
+  Index sale solo con la DANN su tutti i vetrini (3,09).
+
+**Conseguenze.**
+
+1. Dopo E7 ed E8 nessuna ricetta di training, a parità di dati, sposta il centro peggiore senza
+   spostare l'errore su un altro centro. La ricetta di `ln_metastasis` resta vuota.
+2. Lo spostamento dei negativi di un centro nuovo è reale e dipende dal centro escluso in modo
+   instabile tra semi. È un argomento forte per la correzione dell'offset con pochi vetrini negativi del
+   centro nuovo, da discutere con i patologi, e per il rinvio OOD dei casi di un dominio non calibrato.
+3. Il probe sul centro non è una misura utile come soglia di promozione: lo si toglie dal gate (decisione
+   del 19/10/2026) e si tiene come voce riportata con una regola di non regressione.
+4. Se si riprende la DANN, il passo naturale è un protocollo nuovo che ne misuri l'instabilità (più semi,
+   λ più basso), non una scelta a posteriori tra le varianti di E8.
 

@@ -14,7 +14,7 @@ from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
-from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, fit_recipe
+from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
 from tumordetector.heads.protocol import (
     center_probe,
     fit_temperature,
@@ -22,10 +22,11 @@ from tumordetector.heads.protocol import (
     robustness_index,
     run_head_protocol,
     sigmoid,
+    slide_representations,
 )
 from tumordetector.heads.spec import HeadSpec
 from tumordetector.io import read_json, write_json
-from tumordetector.mil.evaluate import across_seeds
+from tumordetector.mil.evaluate import across_seeds, binary_metrics
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = {"id": "ln", "version": 1, "module": "M4", "task": "binary", "sites": ["C77.3"],
@@ -320,3 +321,44 @@ def test_recipes_are_checked_and_every_one_still_learns(manifest_row):
     mixed = run_head_protocol(dev, bags, labels.get, MIL, seed=0, inner_folds=2, recipe=["balanced", "stat_mix"])
     assert np.allclose(plain["predictions"].logit, same["predictions"].logit, atol=1e-4)
     assert not np.allclose(plain["predictions"].logit, mixed["predictions"].logit)
+
+
+def test_gradient_reversal_flips_the_gradient_and_ramps_up():
+    x = torch.ones(3, requires_grad=True)
+    grad_reverse(x, 0.5).sum().backward()
+    assert torch.equal(x.grad, torch.full((3,), -0.5))
+    assert dann_lambda(0.0) == 0 and 0.99 < dann_lambda(1.0) <= 1.0 and dann_lambda(0.1) < dann_lambda(0.5)
+
+
+def test_adversarial_training_hides_the_centre_from_the_slide_representation(manifest_row):
+    manifest, bags, _ = synthetic_cohort(manifest_row, n_per_center=16)
+    dev = manifest[manifest.center != "z"].reset_index(drop=True)
+    x = [bags[s] for s in dev.slide_id]
+    domains, centers = (dev.dataset + ":" + dev.center).to_numpy(), dev.center.to_numpy()
+    cfg = OmegaConf.merge(MIL, {"epochs": 15})
+    probes = {}
+    for recipe in (["balanced"], ["balanced", "adversarial"], ["balanced", "adversarial_negatives"]):
+        model = fit_recipe(x, dev.label.to_numpy(), domains, cfg, 0, recipe)
+        z = slide_representations(model, x)
+        probes[recipe[-1]] = center_probe(z, centers, dev.patient_pseudo_id.to_numpy(), seed=0)
+        assert binary_metrics(dev.label, sigmoid(model.head(torch.from_numpy(z)).squeeze(-1).detach().numpy()))[
+            "auroc"] > 0.9, recipe                                    # still learns the task
+    assert probes["adversarial"] < probes["balanced"] - 0.1, probes
+    assert probes["adversarial_negatives"] < probes["balanced"] - 0.1, probes      # the probe reads negatives
+    with pytest.raises(ValueError, match="alternatives"):
+        fit_recipe(x, dev.label.to_numpy(), domains, cfg, 0, ["adversarial", "adversarial_negatives"])
+
+
+def test_the_probe_is_reported_and_only_checked_against_the_validated_model():
+    metrics = {"cv": {"auroc": 0.99, "ece": 0.03}, "loco_worst_auroc": 0.97, "loco_worst_ece": 0.05,
+               "loco_worst_specificity": 0.9, "robustness": {"center_probe_auroc": 0.99, "robustness_index": 2.0}}
+    gate = HeadSpec(**{**SPEC, "gate": {**SPEC["gate"], "max_center_probe_auroc": None}}).gate
+    first = head_gate(metrics, 100, gate)
+    assert first["status"] == "passed" and any("senza soglia" in n for n in first["notes"])
+    assert any("nessun modello validato" in n for n in first["notes"])
+    assert head_gate(metrics, 100, gate, previous_probe=0.985)["status"] == "passed"     # within 0.01
+    worse = head_gate(metrics, 100, gate, previous_probe=0.95)
+    assert worse["status"] == "failed" and "modello validato" in worse["reasons"][0]
+    strict = HeadSpec(**{**SPEC, "gate": {**SPEC["gate"], "max_center_probe_auroc": 0.8}}).gate
+    assert head_gate(metrics, 100, strict)["status"] == "failed"                        # a threshold still works
+

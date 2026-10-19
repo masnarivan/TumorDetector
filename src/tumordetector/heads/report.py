@@ -43,6 +43,7 @@ def render(result: dict, verdict: dict, context: dict) -> str:
         f"**Esito della batteria: {VERDICT[verdict['status']]}** (media su {len(seeds)} semi)",
         "",
         *[f"- {r}" for r in verdict["reasons"]],
+        *[f"- *{n}*" for n in verdict.get("notes", [])],
         "",
         "Solo uso di ricerca. Le soglie della batteria sono proposte iniziali, da fissare con i patologi.",
         "",

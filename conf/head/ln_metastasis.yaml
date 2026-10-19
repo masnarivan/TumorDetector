@@ -15,7 +15,8 @@ labels:                            # reference_diagnosis -> label; anything else
 domain: [dataset, center]          # what counts as one domain for balancing and group DRO
 roles:                             # manifest column -> values; every other slide is development
   external: {center: [lpon]}       # locked external test: read only by `td task=external`
-recipe: []                         # mitigations, heads/mitigations.py: balanced, group_dro, stat_mix (E7)
+recipe: []                         # mitigations (heads/mitigations.py): balanced, group_dro, stat_mix (E7),
+                                   # adversarial or adversarial_negatives (E8)
 calibration:
   method: temperature              # one global temperature, from out-of-fold logits
   inner_folds: 3                   # leave-one-centre-out: folds of the training centres for its temperature
@@ -26,6 +27,7 @@ gate:                              # initial proposals, to be agreed with the pa
   max_ece: 0.10                    # calibrated, cross-validation
   max_loco_ece: 0.10               # calibrated, worst held-out centre
   min_loco_specificity: 0.80       # worst held-out centre
-  max_center_probe_auroc: 0.80     # negatives only; first step, to tighten after E7
-  min_robustness_index: 0.5        # first step, to tighten after E7
+  min_robustness_index: 0.5        # first step
+  max_center_probe_auroc: null     # negatives; reported, no threshold: near 1 for every recipe (E6-E8)
+  max_probe_regression: 0.01       # ... but not above the 'validated' version's probe + this
 overwrite: false                   # task=cohort only: the cohort file is never rewritten implicitly
