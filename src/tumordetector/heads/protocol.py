@@ -189,8 +189,11 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
         test_ids = list(table[table.center == c].slide_id)
         _, logits = train_score(list(train.slide_id), test_ids, f"held-out {c}", "loco")
         if logits is not None and inner_logits:
-            temperatures[f"held-out {c}"] = fit_temperature(np.concatenate(inner_logits), t.label[inner_ids].to_numpy())
+            inner_logits = np.concatenate(inner_logits)
+            temperatures[f"held-out {c}"] = fit_temperature(inner_logits, t.label[inner_ids].to_numpy())
             record(test_ids, logits, temperatures[f"held-out {c}"], f"held-out {c}", "loco")
+            # the inner out-of-fold logits too: the calibration set of this rotation (E10, conformal)
+            record(inner_ids, inner_logits, temperatures[f"held-out {c}"], f"held-out {c}", "loco-calibration")
 
     final = None
     if table.label.nunique() == 2:

@@ -16,6 +16,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | fatto: gate non superato, i normali di un centro nuovo salgono | se più centri bastano; riferimento per le mitigazioni (E7) |
 | E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | fatto: nessuna adottata, l'errore si sposta tra centri | quale ricetta di training adottare per le teste |
 | E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
+| E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | protocollo fissato | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1036,3 +1037,126 @@ report in `data/reports/experiments/e8/`, confronto in `data/reports/experiments
 4. Se si riprende la DANN, il passo naturale è un protocollo nuovo che ne misuri l'instabilità (più semi,
    λ più basso), non una scelta a posteriori tra le varianti di E8.
 
+
+## E10 — Insiemi conformal e rinvio al patologo
+
+Protocollo fissato il 20/10/2026, **prima di calcolare qualunque insieme conformal o tasso di rinvio**
+su questi dati. Riferimento: E6 (ricetta vuota, la ricetta di `ln_metastasis` dopo E7 ed E8). Il
+numero E9 è riservato alla correzione dell'offset con pochi negativi del centro nuovo, ancora da
+discutere con i patologi.
+
+**Domanda.** Se la testa, invece di una risposta sì/no alla soglia 0,5, restituisce un insieme di
+etichette con copertura dichiarata, su un centro mai visto (a) la copertura dei positivi regge, e (b)
+i negativi spostati verso il tumore (E6: logit mediana dei negativi di Utrecht escluso circa +0,1
+contro circa −7 sui centri visti) diventano **rinvii** invece di falsi positivi? A quale tasso di
+rinvio, alla prevalenza attesa?
+
+**Perché ora.** E7 ed E8 non hanno trovato una ricetta che sposti il centro peggiore senza spostare
+l'errore. Il piano prevede che ogni modulo possa rispondere "rinvio al patologo"; la batteria ha
+ancora a "no" le voci copertura conformal e tasso di rinvio alla prevalenza reale. È un'analisi sulle
+logit, nessun nuovo training.
+
+**Dati.** Cohort `ln_metastasis` v1, 771 vetrini di sviluppo, Phikon `057cc0295895`, ricetta vuota,
+semi 0, 1, 2. LPON non viene letto.
+
+- Le logit di CV e di leave-one-centre-out di E6 sono salvate per vetrino e per seme
+  (`data/reports/phikon/heads/ln_metastasis/predictions.csv`, verificato: 771 righe di CV e 771 di
+  LOCO per seme, con la temperatura di ogni valutazione).
+- **Mancano le logit dei fold interni del leave-one-centre-out** (quelle che danno la temperatura
+  della rotazione): `heads/protocol.py` le usa e non le registra. Senza di loro il quantile della
+  rotazione dovrebbe venire dalle logit di CV, prodotte da modelli che hanno visto il centro escluso.
+  Quindi: (1) il protocollo registra anche le logit interne (gruppo `loco-calibration`), senza altre
+  modifiche al training; (2) E6 si riesegue con lo stesso codice di training, gli stessi semi e un
+  thread (`mil.register=false`, report in `data/reports/experiments/e10/e6/`); (3) **controllo
+  preliminare**: le logit di CV e di LOCO della riesecuzione devono coincidere con quelle salvate
+  (differenza massima ≤ 1e-6). Se non coincidono, E10 usa solo la riesecuzione e la differenza si
+  riporta.
+
+**Punteggio e insiemi.** Per ogni vetrino p = sigmoide(logit / *T*), con la temperatura della sua
+valutazione (globale in CV, della rotazione in LOCO). Punteggio di non conformità rispetto
+all'etichetta y: s = 1 − p(y). Per un gruppo di calibrazione di n punteggi, q è il
+⌈(n + 1)(1 − α)⌉-esimo più piccolo (q = 1 se l'indice supera n). Un'etichetta entra nell'insieme se
+il suo punteggio è ≤ q del suo gruppo. Esito per il vetrino:
+
+| Insieme | Esito |
+|---|---|
+| `{1}` | risposta: positivo |
+| `{0}` | risposta: negativo |
+| `{0, 1}` | rinvio, motivo "incerto" |
+| `{}` | rinvio, motivo "anomalo" |
+
+**Calibrazione e valutazione.**
+
+- *Centro escluso* (la misura principale): in ogni rotazione i quantili si calcolano sulle logit dei
+  fold interni dei soli centri di training, con la temperatura della rotazione, e si applicano alle
+  probabilità LOCO del centro escluso. Il centro escluso non contribuisce mai ai suoi quantili.
+- *Centro visto* (riferimento): per ogni fold k di CV i quantili si calcolano sulle logit fuori fold
+  degli altri fold, e si applicano al fold k.
+
+**Varianti** (Mondrian = un quantile per gruppo).
+
+1. `marginale`: un solo quantile per tutti i vetrini.
+2. `per classe`: un quantile per i positivi e uno per i negativi.
+3. `per classe × centro`: un quantile per classe e per centro di calibrazione. Sul centro escluso,
+   che per costruzione non ha vetrini di calibrazione, si usa per ogni classe **il quantile più alto
+   tra i centri di training** (la scelta più prudente, fissata ora); sul centro visto, quello del
+   suo centro. La variante con vetrini del centro nuovo è E9, non questa.
+
+Livelli: α = 0,05 (principale) e α = 0,10.
+
+**Esiti** (per seme e media sui tre semi; per centro escluso e per classe).
+
+- Primari, α = 0,05:
+  - copertura dei positivi sul centro escluso peggiore;
+  - quota dei negativi del centro escluso con risposta `{1}` (falsi positivi dati come risposta) sul
+    centro peggiore, accanto a 1 − specificità di E6 alla soglia 0,5 sullo stesso centro.
+- Secondari:
+  - copertura dei negativi;
+  - tumori persi (positivi con risposta `{0}`);
+  - tasso di rinvio per classe e per motivo;
+  - dimensione media dell'insieme;
+  - errore sulle risposte (insiemi di una sola etichetta sbagliati / insiemi di una sola etichetta);
+  - tutte le voci sul centro visto;
+  - α = 0,10.
+- Alla prevalenza π dei positivi, per π ∈ {0,05; 0,10; 0,20; 0,30} e quella del cohort, per ogni
+  centro escluso. Con r = tasso di rinvio, a₁ = P(`{1}` | y = 1), f₀ = P(`{1}` | y = 0),
+  a₀ = P(`{0}` | y = 0), f₁ = P(`{0}` | y = 1):
+  - rinvii(π) = π · r₁ + (1 − π) · r₀;
+  - PPV(π) = π a₁ / (π a₁ + (1 − π) f₀);
+  - NPV(π) = (1 − π) a₀ / ((1 − π) a₀ + π f₁).
+  
+  Il valore di π del centro va chiesto ai patologi; la griglia serve a non sceglierlo dopo aver visto i
+  numeri.
+
+**Criterio** (fissato ora). A α = 0,05 una variante è **utilizzabile** se, in media sui semi, la
+copertura dei positivi è ≥ 0,90 (1 − α − 0,05) **su ogni centro escluso**. Tra le varianti
+utilizzabili si sceglie quella con il tasso di rinvio più basso sul centro escluso che ne ha di
+più; a parità entro 0,02, la più semplice nell'ordine 1, 2, 3. Se una variante è scelta:
+
+- la testa restituisce anche l'insieme e il motivo del rinvio, con i quantili calcolati sulle logit
+  fuori fold della CV di tutto lo sviluppo, applicati al modello finale (come la temperatura);
+- la voce "Copertura conformal" della batteria passa a "sì", con la regola di questo criterio nel
+  gate della testa.
+
+Se nessuna è utilizzabile, la copertura non si può dichiarare su un centro nuovo senza vetrini di
+quel centro: insiemi e rinvii si rimandano a E9.
+
+Il tasso di rinvio accettabile non è un vincolo di questo esperimento: lo decidono i patologi, sui
+numeri alla prevalenza.
+
+**Limiti.**
+
+- La garanzia formale del conformal richiede che i vetrini nuovi siano scambiabili con quelli di
+  calibrazione: un centro mai visto la viola per costruzione, ed è proprio ciò che il
+  leave-one-centre-out misura.
+- I punteggi di calibrazione vengono dai modelli dei fold interni, non dal modello LOCO a cui si
+  applicano; è la stessa approssimazione della temperatura (in produzione: CV fuori fold applicata al
+  modello finale), più vicina a una cross-conformal che a una split conformal in senso stretto.
+- Pochi positivi per centro (CWZ 35, Rijnstate 32): l'errore standard di una copertura di 0,95 è
+  circa 0,04, dell'ordine della tolleranza di 0,05.
+- Tre semi, con la variabilità di E6–E8 (specificità di Utrecht escluso da 0,09 a 0,82 tra semi).
+- Solo il livello del vetrino (nessun insieme per regione), un backbone (va rivalidato con
+  H-optimus-0), prevalenze non stimate su dati locali.
+
+**Codice.** Il calcolo è in `experiments/e10_conformal.py`; lo script si committa prima di
+eseguirlo sulla riesecuzione di E6, come per E7 ed E8.

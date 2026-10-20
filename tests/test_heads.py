@@ -210,6 +210,11 @@ def test_head_protocol_runs_loco_on_every_centre_and_calibrates_without_it(manif
     rob = m["robustness"]
     assert rob["center_probe_auroc"] > 0.8 and rob["robustness_index"] is not None
     assert (pd.DataFrame(out["runs"]).group == "loco-calibration").sum() == 8   # 4 centres x 2 inner folds
+    cal = out["predictions"][out["predictions"].group == "loco-calibration"]
+    for c in "abcd":   # the calibration set of a rotation: every training slide once, none of the held-out centre
+        rows = cal[cal.evaluation == f"held-out {c}"]
+        assert sorted(rows.slide_id) == sorted(dev[dev.center != c].slide_id)
+        assert (rows.temperature == m["temperature"][f"held-out {c}"]).all()
     verdict = head_gate(m, len(dev), HeadSpec(**SPEC).gate)
     assert verdict["status"] in ("passed", "failed") and all(isinstance(r, str) for r in verdict["reasons"])
 
