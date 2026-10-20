@@ -16,7 +16,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | fatto: gate non superato, i normali di un centro nuovo salgono | se più centri bastano; riferimento per le mitigazioni (E7) |
 | E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | fatto: nessuna adottata, l'errore si sposta tra centri | quale ricetta di training adottare per le teste |
 | E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
-| E9 | Correzione dell'offset con pochi negativi del centro nuovo | protocollo fissato | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
+| E9 | Correzione dell'offset con pochi negativi del centro nuovo | fatto: non proponibile; specificità recuperata da k = 3, ma si perdono micrometastasi | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
@@ -1158,6 +1158,63 @@ La combinazione offset + conformal è un protocollo nuovo, non una variante di q
 
 **Codice.** Il calcolo sarà in `experiments/e9_offset.py`; lo script si committa prima di eseguirlo
 sulla riesecuzione di E6.
+
+**Risultati** (20/10/2026, codice `b6da989`, due minuti di calcolo sulla riesecuzione di E6 di E10;
+risultati in `data/reports/experiments/e9/summary.md`, da `experiments/e9_offset.py` committato prima
+dell'esecuzione, con le due modifiche al criterio annotate sopra). Controllo della riesecuzione superato
+(come in E10).
+
+Media su 200 estrazioni e tre semi; tra parentesi E6 senza correzione sugli stessi vetrini:
+
+| Centro escluso | Specificità, k = 3 | Specificità, k = 20 | Sensibilità, k = 20 (E6; centro visto) | ECE, k = 20 | b medio |
+|---|---|---|---|---|---|
+| Utrecht | 0,972 (0,492) | 0,980 (0,492) | **0,912** (0,981; 0,992) | 0,063 (0,260) | 6,0 |
+| CWZ | 0,965 (0,770) | 0,983 (0,773) | **0,861** (0,962; 0,924) | 0,086 (0,154) | 5,1 |
+| Radboud | 0,973 (0,911) | 0,977 (0,912) | 0,941 (0,978; 0,975) | 0,039 (0,100) | 3,5 |
+| Rijnstate | 0,985 (0,973) | 0,984 (0,972) | 0,938 (0,938; 0,938) | 0,027 (0,029) | 1,0 |
+
+(Variante `offset solo in discesa`; la variante in due versi dà gli stessi numeri a Utrecht e CWZ e una
+specificità più bassa a Radboud con k piccolo.)
+
+**Esito secondo il criterio: nessun k proponibile, per nessuna delle due varianti.** I primari sono
+raggiunti con ampio margine per ogni k (specificità peggiore da +0,44 a +0,49; ECE peggiore da −0,17 a
+−0,18), e il 10° percentile delle estrazioni su Utrecht è 0,94 già con k = 3. Il vincolo sulla
+sensibilità no: Utrecht perde 0,08 rispetto al centro visto, CWZ 0,06–0,07, con ogni k.
+
+**Lettura** (oltre il criterio, quindi ipotesi).
+
+- **Lo spostamento dei negativi è davvero di livello, e pochi negativi bastano a misurarlo.** Con 3
+  negativi la mediana delle logit dei negativi di Utrecht torna da −0,7 a −6,8, quella di riferimento è
+  −6,7; la specificità passa da 0,49 a 0,97. Aumentare k riduce la dispersione di b (da 1,6 a 0,6) ma
+  cambia poco la media: **il problema non è la stima dell'offset**.
+- **La sensibilità persa è quasi tutta micrometastasi.** I positivi che scendono sotto la soglia dopo la
+  correzione, a Utrecht e CWZ, sono 16 vetrini diversi tra i semi: 15 micrometastasi e una
+  macrometastasi (`patient_045_node_0`, in due semi su tre). In un vetrino con poco tumore la logit è
+  fatta soprattutto dal tessuto normale. In E6 lo spostamento del tessuto normale li spingeva sopra la
+  soglia: la sensibilità di E6 sul centro escluso è in parte quella di un modello che dice "tumore" a
+  tutto il centro. La correzione toglie lo spostamento anche a loro.
+- **Il trasferimento tra dataset dà due risposte diverse.** A Utrecht la correzione stimata su un dataset
+  funziona sull'altro (specificità da 0,43 a 0,96 e da 0,57 a 1,00), ma da CAMELYON16 a CAMELYON17 la
+  sensibilità scende da 0,93 a 0,80. A Radboud l'offset stimato su CAMELYON17 e applicato a CAMELYON16
+  (i casi del 2015, E3b) è negativo (b = −1,2) e nella variante in due versi abbassa la specificità da
+  0,88 a 0,76; la variante solo in discesa la tiene a 0,90. **È l'unico argomento netto tra le due
+  varianti: solo in discesa.**
+
+**Conseguenze.**
+
+1. Nella forma di questo protocollo la correzione dell'offset non si porta ai patologi come
+   proponibile. I numeri vanno comunque portati: su Utrecht si scambiano circa 49 punti di specificità
+   con 8 di sensibilità, e quella sensibilità sono micrometastasi. Se lo scambio sia accettabile è una
+   decisione clinica (pN1mi), non un parametro.
+2. Il limite non è la correzione ma la soglia unica a livello di vetrino: dopo la correzione i negativi
+   stanno a −7 e le micrometastasi perse intorno a 0. Due strade, ognuna un protocollo nuovo:
+   - **offset + soglia scelta per la sensibilità** (per esempio il quantile dei positivi di E10 sulle
+     logit corrette), così che le micrometastasi finiscano in rinvio invece che in "negativo";
+   - **un segnale che non dipenda dalla media del vetrino** per i tumori piccoli (attenzione o
+     punteggio per tile), dove il tessuto normale non diluisce il tumore.
+3. Le micrometastasi sono il punto debole in tutti e due gli esperimenti di oggi (E10: tutti i tumori
+   persi; E9: quasi tutta la sensibilità persa). Vanno riportate come sottogruppo nella batteria della
+   testa.
 
 ## E10 — Insiemi conformal e rinvio al patologo
 
