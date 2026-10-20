@@ -1118,6 +1118,22 @@ dell'insieme per cui, in media su estrazioni e semi:
 - il 10° percentile della specificità sul centro peggiore non è sotto la specificità di E6 su quel
   centro.
 
+*Modifica del 20/10/2026, prima dell'esecuzione sui dati reali.* Il centro della terza condizione è
+**il centro peggiore di E6** (quello da correggere), non il peggiore dopo la correzione. Motivo: la
+prova su dati sintetici con un solo centro spostato ha mostrato che, una volta corretto quel centro, il
+peggiore diventa un centro che andava già bene, dove il 10° percentile delle estrazioni sta per
+costruzione sotto la media di E6; la condizione fallirebbe sempre. L'intento era proteggere il centro
+corretto da un'estrazione sfortunata.
+
+*Seconda modifica del 20/10/2026, prima dell'esecuzione sui dati reali.* Il vincolo sulla sensibilità
+si misura rispetto alla sensibilità **dello stesso centro quando è visto in training** (CV di E6,
+soglia 0,5), non rispetto a E6 sul centro escluso: la sensibilità di ogni centro escluso dopo la
+correzione non scende più di 0,05 sotto quella. Motivo: nella prova sintetica il centro spostato aveva
+in E6 sensibilità 1,00 *perché* tutto il centro saliva verso il tumore; la correzione lo riportava a
+0,94, come gli altri centri, e il vincolo la bocciava. Lo scopo della correzione è riportare il centro
+nuovo a comportarsi come uno visto: il confronto è con quello. La perdita rispetto a E6 resta nel
+report.
+
 Se entrambe le varianti hanno un k proponibile, si propone quella con k minore; a parità di k, la 2
 (non alza mai le logit, quindi non può creare falsi positivi dove E6 non ne aveva). Se nessun k è
 proponibile, la correzione dell'offset non si porta ai patologi in questa forma.
