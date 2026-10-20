@@ -16,7 +16,8 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E6 | Baseline su 4 centri (CAMELYON16 + 17), nessuna mitigazione, temperatura globale | fatto: gate non superato, i normali di un centro nuovo salgono | se più centri bastano; riferimento per le mitigazioni (E7) |
 | E7 | Mitigazioni del centro nella testa: bilanciamento per dominio, group DRO, mescolanza delle statistiche | fatto: nessuna adottata, l'errore si sposta tra centri | quale ricetta di training adottare per le teste |
 | E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
-| E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | protocollo fissato | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
+| E9 | Correzione dell'offset con pochi negativi del centro nuovo | protocollo fissato | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
+| E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1038,6 +1039,110 @@ report in `data/reports/experiments/e8/`, confronto in `data/reports/experiments
    λ più basso), non una scelta a posteriori tra le varianti di E8.
 
 
+## E9 — Correzione dell'offset con pochi negativi del centro nuovo
+
+Protocollo fissato il 20/10/2026, dopo E8 e prima di ogni correzione dell'offset su questi dati.
+Riferimento: E6 (ricetta vuota). Il numero viene prima di E10 ma il protocollo è stato scritto dopo:
+E10 non dipende da E9.
+
+**Domanda.** In E6–E8 i negativi di un centro mai visto salgono verso il tumore come blocco (logit
+mediana dei negativi di Utrecht escluso circa +0,1 contro circa −7 sui centri visti), e nessuna
+ricetta di training lo corregge senza spostare l'errore altrove. Se all'installazione si dispone di
+**k vetrini negativi confermati** del centro nuovo e si sposta di conseguenza la logit di tutti i suoi
+vetrini, quanto si recupera di specificità e calibrazione, quanto si perde di sensibilità, e da quale
+k in poi?
+
+**Che cosa decide e che cosa no.** E9 misura. Usare vetrini del centro all'installazione rivede la
+decisione del 18/10/2026 "solo calibrazione globale" (training-multicentro.md): **l'adozione la
+decidono i patologi**, su questi numeri e sul costo di raccogliere k negativi confermati. Il criterio
+qui sotto dice solo se e da quale k la correzione è *proponibile*.
+
+**Dati.** Gli stessi di E10: la riesecuzione di E6 (`data/reports/experiments/e10/e6/predictions.csv`)
+con il controllo preliminare di E10 superato; se non lo supera, E9 usa comunque la riesecuzione e la
+differenza si riporta. Per ogni seme e rotazione LOCO servono:
+
+- le logit LOCO del centro escluso e la temperatura *T* della rotazione;
+- le logit dei fold interni dei centri di training (gruppo `loco-calibration`), che danno il livello
+  di riferimento dei negativi **senza il centro escluso**.
+
+Nessun nuovo training; LPON non viene letto.
+
+**Correzione.** Livello di riferimento m_ref = mediana delle logit dei negativi nei fold interni della
+rotazione. Livello del centro nuovo m_k = mediana delle logit dei k negativi estratti. Offset
+b = m_k − m_ref. Per ogni altro vetrino del centro: p = sigmoide((logit − b) / *T*), soglia 0,5. La
+temperatura resta quella della rotazione; uno spostamento uguale per tutto il centro non cambia
+l'ordinamento, quindi l'AUROC del centro non cambia per costruzione (si riporta come controllo).
+
+Due varianti:
+
+1. `offset`: b come sopra, in entrambe le direzioni.
+2. `offset solo in discesa`: b' = max(b, 0). Corregge solo i centri i cui negativi stanno *sopra* il
+   riferimento, cioè lo spostamento osservato, e non alza mai le logit di un centro.
+
+In produzione m_ref sarebbe la mediana dei negativi nelle logit fuori fold della CV di tutto lo
+sviluppo, applicata al modello finale (come la temperatura).
+
+**Estrazioni.** k ∈ {3, 5, 10, 20}. Per ogni seme, rotazione e k: 200 estrazioni casuali senza
+reimmissione di k negativi del centro escluso (generatore con seme 0, fissato), tra tutti i suoi
+negativi. Ogni estrazione si valuta sugli **altri** vetrini del centro (tutti i positivi e i negativi
+non estratti). Ogni centro ha almeno 58 negativi (CWZ), quindi k = 20 lascia sempre almeno 38
+negativi di valutazione.
+
+**Esiti** (per variante e k; media sulle 200 estrazioni, poi sui tre semi; per centro escluso).
+
+- Primari:
+  - specificità sul centro escluso peggiore;
+  - ECE calibrata sul centro escluso peggiore.
+- Vincoli:
+  - sensibilità di ogni centro escluso;
+  - 10° percentile della specificità sulle estrazioni, sul centro peggiore (un'estrazione sfortunata
+    è ciò che succede in un'installazione vera, che ne fa una sola).
+- Secondari:
+  - mediana delle logit dei negativi dopo la correzione, accanto a m_ref (la misura di E6);
+  - b medio e la sua dispersione tra estrazioni;
+  - AUROC del centro (controllo: invariata);
+  - sensibilità e specificità per dominio;
+  - **offset trasferito tra domini dello stesso centro**: per Radboud e Utrecht, che hanno vetrini di
+    CAMELYON16 e di CAMELYON17, i k negativi si estraggono da un dataset e la correzione si valuta
+    sull'altro, nei due versi. È la cosa più vicina a "negativi raccolti in un periodo, vetrini
+    analizzati in un altro" (E3b: i casi di Radboud del 2015 sono un dominio a parte).
+
+Riferimento per ogni esito: E6 senza correzione sugli stessi vetrini di valutazione.
+
+**Criterio** (fissato ora). Per ciascuna variante, il k minimo *proponibile* è il più piccolo k
+dell'insieme per cui, in media su estrazioni e semi:
+
+- almeno un primario migliora rispetto a E6: specificità sul centro peggiore **+0,10** o più, oppure
+  ECE calibrata peggiore **−0,03** o più (le soglie di E7 ed E8);
+- la sensibilità di nessun centro escluso scende più di **0,05**;
+- il 10° percentile della specificità sul centro peggiore non è sotto la specificità di E6 su quel
+  centro.
+
+Se entrambe le varianti hanno un k proponibile, si propone quella con k minore; a parità di k, la 2
+(non alza mai le logit, quindi non può creare falsi positivi dove E6 non ne aveva). Se nessun k è
+proponibile, la correzione dell'offset non si porta ai patologi in questa forma.
+
+**Legame con E10.** Se l'offset viene adottato, con gli stessi negativi si possono calcolare anche i
+quantili conformal dei negativi del centro nuovo; per α = 0,05 ne servono almeno 19, quindi k = 20.
+La combinazione offset + conformal è un protocollo nuovo, non una variante di questo.
+
+**Limiti.**
+
+- I k negativi vengono dallo stesso insieme di vetrini storici del leave-one-centre-out: in
+  un'installazione vera vengono da un periodo e da una preparazione diversi. Il trasferimento tra
+  dataset dello stesso centro misura in parte questo effetto, ma solo per due centri.
+- Si sposta solo il livello: se un centro nuovo cambia anche la dispersione delle logit dei
+  negativi, una sola correzione additiva non basta (si vede dalla specificità che resta bassa con k
+  grande).
+- Si assume che i positivi del centro nuovo si spostino quanto i negativi; se salgono meno, o non
+  salgono, la correzione costa sensibilità. È il vincolo sulla sensibilità a misurarlo.
+- Tre semi, con la variabilità di E6–E8 (specificità di Utrecht escluso da 0,09 a 0,82 tra semi);
+  quattro rotazioni; un backbone (va rivalidato con H-optimus-0).
+- I k negativi devono avere diagnosi confermata: è un costo per il centro, che il criterio non pesa.
+
+**Codice.** Il calcolo sarà in `experiments/e9_offset.py`; lo script si committa prima di eseguirlo
+sulla riesecuzione di E6.
+
 ## E10 — Insiemi conformal e rinvio al patologo
 
 Protocollo fissato il 20/10/2026, **prima di calcolare qualunque insieme conformal o tasso di rinvio**
@@ -1160,3 +1265,62 @@ numeri alla prevalenza.
 
 **Codice.** Il calcolo è in `experiments/e10_conformal.py`; lo script si committa prima di
 eseguirlo sulla riesecuzione di E6, come per E7 ed E8.
+
+**Risultati** (20/10/2026, codice `7595dbb`, `experiments/e10_run.sh`: riesecuzione di E6 in 5 ore e 17
+minuti, tre semi in parallelo; risultati in `data/reports/experiments/e10/summary.md` e `metrics.csv`,
+da `experiments/e10_conformal.py` committato prima dell'esecuzione).
+
+**Controllo preliminare superato**: le logit di CV e di LOCO della riesecuzione coincidono con quelle
+di E6 (differenza massima 0 su 4626 righe). Il codice di E7 ed E8 non ha cambiato la ricetta vuota.
+
+Centro escluso, α = 0,05, media sui semi:
+
+| | marginale | per classe | per classe × centro |
+|---|---|---|---|
+| **Copertura dei positivi, centro peggiore** (primario, ≥ 0,90) | 0,938 (Rijnstate) | 0,933 (CWZ) | 0,979 (Rijnstate) |
+| **Negativi di Utrecht con risposta {1}** (primario; E6 alla soglia 0,5: 0,508) | 0,453 | 0,366 | 0,187 |
+| Negativi di CWZ con risposta {1} (E6: 0,230) | 0,144 | 0,138 | 0,190 |
+| Negativi di Radboud con risposta {1} (E6: 0,089) | 0,048 | 0,132 | 0,073 |
+| Rinvii, centro che ne ha di più | 0,233 (CWZ) | 0,136 (Radboud) | 0,516 (CWZ) |
+| Rinvii a Utrecht | 0,060 | 0,058 | 0,507 |
+| Tumori persi, centro peggiore | 0,062 (Rijnstate) | 0,062 (Rijnstate) | 0,021 (Rijnstate) |
+
+**Esito secondo il criterio: scelta la variante «per classe».** Tutte e tre sono utilizzabili (copertura
+dei positivi ≥ 0,90 su ogni centro escluso); «per classe» ha meno rinvii sul centro peggiore.
+
+**Lettura** (oltre il criterio, quindi ipotesi).
+
+- **Risposta (a) sì, risposta (b) no.** La copertura dei positivi regge su ogni centro escluso, ma i
+  negativi spostati di Utrecht **non diventano rinvii**: con «per classe» il 37% riceve comunque la
+  risposta «positivo», e i rinvii a Utrecht sono solo il 6%. Nel seme 1 i negativi con risposta {1}
+  sono il 91%, come i falsi positivi di E6. Lo spostamento non è incertezza: il modello è *sicuro* che
+  quei negativi siano tumori, e un insieme conformal non lo può vedere. È un argomento per E9 (lo
+  spostamento è di livello) e per un controllo OOD a monte (M3), non per un α diverso.
+- **Le risposte negative reggono su ogni centro.** Tumori persi ≤ 6% ovunque, NPV ≥ 0,98 su ogni centro
+  escluso per π ≤ 0,30. I tumori persi sono sempre gli stessi vetrini, e sono tutti **micrometastasi**:
+  `patient_067_node_4` e `patient_073_node_3` (Rijnstate, in tutti i semi), `patient_020_node_1`,
+  `patient_020_node_2` e `patient_021_node_4` (CWZ, in alcuni semi). `patient_067_node_4` è uno dei vetrini
+  del punto cieco della griglia (C17 §1: 31% del tumore nelle tile). Le risposte positive invece non
+  reggono su uno scanner nuovo: PPV di Utrecht 0,55 a π = 0,20. Lo strumento oggi è credibile per
+  **escludere**, non per confermare.
+- **Garantire la sensibilità costa specificità dove E6 andava bene.** Il quantile dei positivi può
+  portare la soglia di {1} sotto 0,5 (Rijnstate, seme 2: p ≥ 0,39): a Radboud «per classe» dà più
+  negativi con risposta {1} di E6 (0,132 contro 0,089).
+- **Con due classi l'insieme vuoto non vuol dire "anomalo".** È vuoto quando i due quantili lasciano
+  scoperta la zona centrale delle probabilità, cioè per i vetrini incerti; a α = 0,10 quasi tutti i
+  rinvii sono di questo tipo. Il motivo "anomalo" fissato nel protocollo (punto *Punteggio e insiemi*)
+  è sbagliato: entrambi i tipi di rinvio sono "incerto" (nota del 20/10/2026, dopo i risultati). Il
+  rinvio per vetrino anomalo resta compito del controllore (M3).
+- **Il quantile più prudente per centro** dimezza i negativi di Utrecht con risposta {1} (0,187), ma
+  rinvia circa metà dei vetrini su tre centri su quattro.
+
+**Conseguenze.**
+
+1. Come previsto dal criterio, la testa restituirà anche l'insieme «per classe» con il motivo del
+   rinvio (quantili dalle logit fuori fold della CV, applicati al modello finale), e la voce
+   "Copertura conformal" della batteria passa a "sì" con la regola di questo criterio nel gate. Da
+   implementare: ancora nessun modello registrato con gli insiemi.
+2. Il conformal non risolve lo spostamento dei negativi su uno scanner nuovo: E9 resta necessario, e la
+   combinazione offset + conformal con k = 20 negativi è il protocollo naturale dopo E9.
+3. Da portare ai patologi: con un'installazione senza vetrini locali, le risposte «negativo» sono
+   affidabili su ogni centro misurato (micrometastasi a parte), quelle «positivo» no.
