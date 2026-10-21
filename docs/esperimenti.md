@@ -18,7 +18,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
 | E9 | Correzione dell'offset con pochi negativi del centro nuovo | fatto: non proponibile; specificità recuperata da k = 3, ma si perdono micrometastasi | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
-| E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | protocollo fissato | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
+| E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1201,6 +1201,11 @@ sensibilità no: Utrecht perde 0,08 rispetto al centro visto, CWZ 0,06–0,07, c
   0,88 a 0,76; la variante solo in discesa la tiene a 0,90. **È l'unico argomento netto tra le due
   varianti: solo in discesa.**
 
+*Correzione del 21/10/2026, dopo E11.* La frase "dopo la correzione i negativi stanno a −7 e le
+micrometastasi perse intorno a 0" (punto 2 delle conseguenze) è sbagliata: intorno a 0 (mediana tra +2 e
++4) stanno le logit dei positivi persi **prima** della correzione. Dopo, la mediana è −4,2 a CWZ e −2,1 a
+Utrecht, e metà sono sotto −3. Su quella lettura si basava l'ipotesi di E11.
+
 **Conseguenze.**
 
 1. Nella forma di questo protocollo la correzione dell'offset non si porta ai patologi come
@@ -1510,3 +1515,55 @@ sono: quanti negativi confermati servono, quanti rinvii, quante micrometastasi r
 **Codice.** Il calcolo sarà in `experiments/e11_offset_conformal.py`, che riusa le funzioni di
 `e9_offset.py` ed `e10_conformal.py`; lo script si prova su dati sintetici e si committa prima di
 eseguirlo.
+
+**Risultati** (21/10/2026, codice `35f5986`, sei secondi di calcolo sulla riesecuzione di E6 di E10;
+risultati in `data/reports/experiments/e11/summary.md`, da `experiments/e11_offset_conformal.py`
+committato prima dell'esecuzione, con la modifica al percentile annotata sopra). Controllo della
+riesecuzione superato.
+
+α = 0,05, k = 20, media su 200 estrazioni e tre semi, sugli stessi vetrini di valutazione:
+
+| | V1 offset + per classe | V2 negativi locali | E10 per classe | E9 offset |
+|---|---|---|---|---|
+| Negativi con risposta {1}, Utrecht | 0,012 | 0,012 | 0,366 | 0,020 |
+| Negativi con risposta {1}, centro peggiore | 0,051 (Radboud) | 0,021 (Radboud) | 0,366 (Utrecht) | 0,023 (Radboud) |
+| **Copertura dei positivi, CWZ** (≥ 0,90) | **0,779** | **0,779** | 0,933 | — |
+| Tumori persi, CWZ (sensibilità del centro visto 0,924) | 0,158 | 0,107 | 0,038 | 0,140 |
+| Tumori persi, Utrecht (visto 0,992) | 0,077 | 0,046 | 0,023 | 0,088 |
+| Micrometastasi perse, CWZ / Utrecht | 0,224 / 0,150 | 0,163 / 0,100 | 0,058 / 0,053 | 0,212 / 0,167 |
+| Micrometastasi rinviate, CWZ / Utrecht | 0,155 / 0,056 | 0,157 / 0,072 | 0,101 / 0,009 | — |
+| Rinvii, CWZ / Utrecht | 0,068 / 0,023 | 0,077 / 0,043 | 0,100 / 0,055 | — |
+
+**Esito secondo il criterio: nessuna combinazione proponibile.** V1 non supera la copertura dei positivi
+(CWZ 0,78) né il vincolo sui tumori persi, per ogni k; V2 (solo k = 20) supera i tumori persi (margine
+minimo −0,039, Utrecht) ma non la copertura (CWZ 0,78). I falsi positivi, la cattiva estrazione e i
+rinvii passano per tutte.
+
+**Lettura** (oltre il criterio, quindi ipotesi).
+
+- **L'ipotesi è smentita, e la sua premessa era sbagliata** (correzione annotata in E9). Dopo l'offset le
+  micrometastasi perse non sono incerte: le loro logit corrette hanno mediana −4,2 a CWZ e −2,1 a
+  Utrecht. Un insieme conformal rinvia ciò che il modello non sa decidere, non ciò che vede come un
+  negativo chiaro. Il conformal sulle logit corrette perde quasi gli stessi tumori della sola correzione
+  (V1 0,158 contro E9 0,140 a CWZ).
+- **V1 perde a volte più di E9.** Il quantile dei negativi dei centri di training può superare 0,5 (in
+  E10 fino a 0,84 a CWZ): la zona della risposta «negativo» si allarga sopra la soglia di E9.
+- **I negativi locali aiutano** (V2: tumori persi a Utrecht da 0,077 a 0,046, micrometastasi da 0,150 a
+  0,100), perché il quantile stimato sul centro è più stretto. Non bastano a CWZ.
+- **Il problema non è di calibrazione.** Sul centro visto in training la sensibilità di CWZ è 0,92; sul
+  centro escluso le micrometastasi superano la soglia in E6 soprattutto grazie allo spostamento di tutto
+  il vetrino. Tolto lo spostamento, il modello LOCO non le vede: la logit del vetrino, dominata dal tessuto
+  normale, non porta il segnale di un tumore piccolo su uno scanner nuovo.
+
+**Conseguenze.**
+
+1. Con E9, E10 ed E11 le correzioni a valle sulla logit del vetrino (temperatura, offset, insiemi
+   conformal, e le loro combinazioni) sono esaurite per questo problema: spostano lo scambio tra
+   specificità e micrometastasi, non lo eliminano.
+2. Per i patologi restano due configurazioni, entrambe senza criterio superato. **Senza vetrini locali**
+   (E10 «per classe»): micrometastasi perse circa 5–6%, ma il 37% dei negativi di Utrecht ha risposta
+   «positivo». **Con 20 negativi locali** (V2): negativi con risposta «positivo» ≤ 2%, ma micrometastasi
+   perse 10–16% a Utrecht e CWZ.
+3. Il passo successivo è sul segnale, non sulla calibrazione: un punteggio per i tumori piccoli che non
+   dipenda dalla media del vetrino (attenzione o punteggio per tile, il secondo candidato dopo E9), oppure
+   il backbone dell'MVP (H-optimus-0), che può separare meglio tumore e scanner a livello di tile.
