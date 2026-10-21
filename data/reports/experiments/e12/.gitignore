@@ -3,3 +3,6 @@ predictions.csv
 attention.csv
 instances.csv
 run.log
+tile_classifier.csv
+metrics.csv
+classifier.log
