@@ -19,6 +19,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E9 | Correzione dell'offset con pochi negativi del centro nuovo | fatto: non proponibile; specificità recuperata da k = 3, ma si perdono micrometastasi | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 | E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
+| E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | protocollo fissato | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1567,3 +1568,98 @@ rinvii passano per tutte.
 3. Il passo successivo è sul segnale, non sulla calibrazione: un punteggio per i tumori piccoli che non
    dipenda dalla media del vetrino (attenzione o punteggio per tile, il secondo candidato dopo E9), oppure
    il backbone dell'MVP (H-optimus-0), che può separare meglio tumore e scanner a livello di tile.
+
+## E12 — Un punteggio del vetrino dalle tile più sospette
+
+Protocollo fissato il 21/10/2026, dopo E11 e prima di ogni calcolo di punteggi per tile sul
+leave-one-centre-out. Riferimento: E6 (ricetta vuota).
+
+**Domanda.** E9–E11 hanno mostrato che su un centro nuovo le micrometastasi superano la soglia solo
+grazie allo spostamento di tutto il vetrino: tolto lo spostamento, la logit del vetrino le vede come
+negativi. Un punteggio fatto dalle **poche tile più sospette** del vetrino, invece che dalla media su
+tutte, separa le micrometastasi di un centro mai visto dai negativi di quel centro meglio della logit
+del vetrino, con una soglia scelta senza quel centro?
+
+**Perché un punteggio dalle tile.** La testa dell'ABMIL è lineare sulla rappresentazione pooled
+z = Σ wᵢ hᵢ: la logit del vetrino è esattamente la **media pesata dall'attenzione delle logit delle
+singole tile**, sᵢ = W·hᵢ + b. Una micrometastasi occupa poche tile (la più piccola, 0,2 mm, ne copre
+2–3 da 0,0125 mm²) su una mediana di circa 9 500 per vetrino: nella media pesata pesa poco, e lo
+spostamento del tessuto normale di un centro nuovo pesa su tutte. Un massimo o una media delle prime k
+tile non diluisce il tumore piccolo; resta da misurare quanto lo spostamento alzi anche le tile normali
+più alte (E2: il centro è leggibile da una singola tile).
+
+**Punteggi** (tutti a livello di vetrino, tutti calcolati nel leave-one-centre-out senza il centro
+escluso).
+
+1. `logit del vetrino` (riferimento): la logit ABMIL di E6.
+2. `istanza ABMIL, top-5`: media delle 5 logit d'istanza sᵢ più alte del vetrino, dallo **stesso
+   modello** della rotazione. Nessun modello in più: in produzione è lo stesso ABMIL.
+3. `classificatore di tile, top-5`: media delle 5 log-odds più alte di una regressione logistica
+   tumore/normale sugli embedding delle tile, addestrata per ogni rotazione sui soli centri di training:
+   - tile tumorali (`label = tumor`; le tile di bordo escluse) dai positivi **con annotazione
+     completa** (`exhaustive_annot`), fino a 500 per vetrino;
+   - tile normali dai vetrini negativi, fino a 200 per vetrino;
+   - feature standardizzate sulle tile di training; L2 con C = 1; classi pesate (`balanced`);
+     campionamento delle tile con il seme del run (0, 1, 2).
+
+k = 5 è fissato ora: copre la micrometastasi più piccola (2–3 tile) con un margine contro il rumore
+di una singola tile. k = 1 e k = 20 sono secondari, non si sceglie tra loro a posteriori.
+
+**Soglia, senza il centro escluso.** Per ogni punteggio e rotazione, τ è il valore che lascia sopra il
+95% dei positivi dei centri di training nei loro punteggi fuori fold (i 3 fold interni di E6:
+`cv_fold mod 3`): il ⌊(n + 1) · 0,05⌋-esimo più piccolo tra gli n positivi. È la stessa regola per i
+tre punteggi, quindi il confronto non dipende dalla scala. Per la logit del vetrino vale la stessa
+regola (non la soglia 0,5 di E6), così che i tre partano dalla stessa sensibilità sui centri visti.
+
+**Dati e codice.**
+
+- Classificatore di tile: gli embedding Phikon e le etichette delle tile (`<vetrino>.parquet`) già su
+  disco, nessun nuovo training ABMIL; modelli dei fold interni e di rotazione addestrati come sopra.
+- Istanza ABMIL: le logit d'istanza non sono salvate. Il protocollo registra, per ogni vetrino valutato
+  (LOCO e fold interni `loco-calibration`), le 20 logit d'istanza più alte e la loro posizione; E6 si
+  riesegue (circa 5 ore, `mil.register=false`, report in `data/reports/experiments/e12/e6/`) e le logit
+  del vetrino devono coincidere con quelle salvate (come in E10).
+- Analisi in `experiments/e12_tile_score.py`, provata su dati sintetici e committata prima
+  dell'esecuzione.
+
+**Esiti** (per centro escluso, media sui tre semi).
+
+- Primari, alla soglia τ:
+  - sensibilità sulle **micrometastasi**, sul centro escluso peggiore;
+  - specificità sul centro escluso peggiore.
+- Secondari:
+  - sensibilità sulle macrometastasi e su tutti i positivi;
+  - AUROC per centro escluso, tutti i positivi contro i negativi e micrometastasi contro negativi;
+  - mediana del punteggio dei negativi del centro escluso accanto a quella dei negativi dei centri di
+    training (la misura dello spostamento di E6, per ogni punteggio);
+  - k = 1 e k = 20;
+  - **localizzazione**: sui positivi annotati del centro escluso, quota dei vetrini in cui almeno una
+    delle 5 tile più alte è tumorale (il punteggio guarda il tumore, non un artefatto);
+  - tempo di calcolo per vetrino.
+
+**Criterio** (fissato ora). Un punteggio delle tile è un **segnale candidato** se, in media sui semi,
+rispetto alla logit del vetrino con la stessa regola di soglia:
+
+1. la sensibilità sulle micrometastasi del centro escluso peggiore sale di almeno **0,10**;
+2. la specificità del centro escluso peggiore non scende più di **0,05**;
+3. l'AUROC peggiore (tutti i positivi) non scende più di **0,01**.
+
+Se entrambi sono candidati si sceglie quello con la sensibilità sulle micrometastasi peggiore più alta;
+a parità entro 0,02, l'istanza ABMIL (nessun modello in più da validare e mantenere).
+
+**Che cosa decide.** Solo se esiste un segnale dalle tile che vale la pena combinare con la decisione
+del vetrino. La combinazione (per esempio rinvio se il punteggio delle tile supera τ e la logit corretta
+no, con l'offset di E9 e gli insiemi di E10) è un protocollo successivo, non una scelta a posteriori qui.
+
+**Limiti.**
+
+- Annotazioni complete solo per una parte dei positivi (CWZ 8, Rijnstate 6): quando è escluso Utrecht,
+  il classificatore impara il tumore soprattutto da Radboud; lo sbilanciamento di centro tra tile
+  tumorali e normali può far imparare anche il centro (E2). La valutazione usa le etichette del vetrino,
+  quindi non ne dipende.
+- Il punto cieco della griglia (C17 §1): il tumore fuori dalle tile non può essere trovato da nessun
+  punteggio; i vetrini noti si riportano come sottogruppo.
+- Il massimo su migliaia di tile è sensibile ad artefatti (pieghe, inchiostro, sfocatura), che il
+  controllo qualità non rileva ancora (GrandQC non è integrato); la localizzazione serve a vederlo.
+- I tre semi rappresentano il training ABMIL e il campionamento delle tile, non la variabilità tra
+  vetrini; un backbone (va rivalidato con H-optimus-0).
