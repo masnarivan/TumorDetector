@@ -1480,6 +1480,11 @@ estrazioni e semi:
 5. il tasso di rinvio di nessun centro escluso supera di più di **0,10** quello di E10 «per classe» sullo
    stesso centro.
 
+*Modifica del 21/10/2026, prima dell'esecuzione.* Nella condizione 4 (e nella voce corrispondente degli
+esiti) il percentile è il **90°**, non il 10°: per una quota in cui più alto è peggio, l'estrazione
+sfortunata è quella alta. È l'equivalente del 10° percentile della specificità usato in E9, che era
+l'intento; scrivendo lo script è emerso l'errore.
+
 Il quinto vincolo esclude la soluzione banale (rinviare tutto). Il tasso di rinvio accettabile in
 assoluto resta una decisione dei patologi, sui numeri alla prevalenza.
 
