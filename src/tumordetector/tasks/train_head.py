@@ -77,7 +77,8 @@ def run(cfg: DictConfig):
     metrics, spread = across_seeds([r["metrics"] for r in runs])
     result = {**runs[0], "metrics": metrics, "spread": spread, "seeds": seeds, "excluded": excluded,
               "predictions": pd.concat([r["predictions"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)]),
-              "attention": pd.concat([r["attention"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)])}
+              "attention": pd.concat([r["attention"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)]),
+              "instances": pd.concat([r["instances"].assign(seed=s) for r, s in zip(runs, seeds, strict=True)])}
     model_name = f"head-{spec.id}-{cfg.backbone.name}"
     mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
     try:   # the probe of the version currently validated, for the non-regression rule
@@ -109,6 +110,7 @@ def run(cfg: DictConfig):
     write_json(rep / "calibration.json", calibration)
     result["predictions"].to_csv(rep / "predictions.csv", index=False)
     result["attention"].to_csv(rep / "attention.csv", index=False)
+    result["instances"].to_csv(rep / "instances.csv", index=False)
     excluded.to_csv(rep / "excluded.csv", index=False)
 
     mlflow.set_experiment(f"head-{spec.id}")

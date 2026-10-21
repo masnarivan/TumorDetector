@@ -215,6 +215,10 @@ def test_head_protocol_runs_loco_on_every_centre_and_calibrates_without_it(manif
         rows = cal[cal.evaluation == f"held-out {c}"]
         assert sorted(rows.slide_id) == sorted(dev[dev.center != c].slide_id)
         assert (rows.temperature == m["temperature"][f"held-out {c}"]).all()
+    inst = out["instances"]   # top instance logits of every scored slide, under its prediction's name (E12)
+    keys = ["slide_id", "evaluation", "group"]
+    assert inst[keys].drop_duplicates().merge(out["predictions"][keys]).shape[0] == len(out["predictions"])
+    assert (inst.groupby(keys)["rank"].count() <= 20).all() and (inst.groupby(keys).logit.diff().dropna() <= 0).all()
     verdict = head_gate(m, len(dev), HeadSpec(**SPEC).gate)
     assert verdict["status"] in ("passed", "failed") and all(isinstance(r, str) for r in verdict["reasons"])
 

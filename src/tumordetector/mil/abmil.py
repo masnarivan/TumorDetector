@@ -78,6 +78,19 @@ def predict_logits(model: ABMIL, bags: list[np.ndarray], device: str = "cpu") ->
     return np.array(logits), attention
 
 
+def top_instance_logits(model: ABMIL, bags: list[np.ndarray], top: int, device: str = "cpu") -> list[tuple]:
+    """-> per slide, (logits, tile indices) of its `top` highest instance logits W·h_i + b, highest first.
+    The slide logit is their attention-weighted mean over all tiles (the head is linear on z)."""
+    out = []
+    with torch.inference_mode():
+        for bag in bags:
+            h, _, _ = model.encode(torch.from_numpy(bag.astype(np.float32)).to(device))
+            s = model.head(h).squeeze(-1)
+            v, i = torch.topk(s, min(top, len(s)))
+            out.append((v.cpu().numpy(), i.cpu().numpy()))
+    return out
+
+
 def predict(model: ABMIL, bags: list[np.ndarray], device: str = "cpu") -> tuple[np.ndarray, list[np.ndarray]]:
     """-> probability per slide and attention weights per slide (all tiles, no subsampling)."""
     probs, attention = [], []

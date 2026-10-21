@@ -3,12 +3,13 @@ import mlflow
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 from omegaconf import OmegaConf
 
 from tumordetector import cli
 from tumordetector.embed import store
 from tumordetector.io import read_json, write_json
-from tumordetector.mil.abmil import ABMIL
+from tumordetector.mil.abmil import ABMIL, predict_logits, top_instance_logits
 from tumordetector.mil.evaluate import binary_metrics, ece, gate, make_cv_folds, run_protocol
 
 DIM = 16
@@ -78,6 +79,19 @@ def test_protocol_learns_the_planted_signal_and_passes_the_gate():
     for limit in ({"max_loco_ece": 0.0}, {"min_loco_specificity": 1.01}):
         reasons = gate(m, result["n_slides"], OmegaConf.merge(GATE, limit))["reasons"]
         assert len(reasons) == 1 and "leave-one-center-out" in reasons[0]
+
+
+def test_slide_logit_is_the_attention_weighted_mean_of_the_instance_logits():
+    """The head is linear on z: the premise of experiment E12."""
+    torch.manual_seed(0)
+    model = ABMIL(DIM, 32, 0.0).eval()
+    bag = np.random.default_rng(0).normal(size=(50, DIM)).astype(np.float32)
+    logits, att = predict_logits(model, [bag])
+    [(top, idx)] = top_instance_logits(model, [bag], top=50)
+    every = np.empty(50)
+    every[idx] = top
+    assert np.isclose(logits[0], float((att[0] * every).sum()), atol=1e-5)
+    assert (np.diff(top) <= 0).all() and len(top_instance_logits(model, [bag[:3]], top=20)[0][0]) == 3
 
 
 def test_slide_mean_normalisation_ignores_what_every_tile_shares():

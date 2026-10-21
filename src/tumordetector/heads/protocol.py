@@ -21,10 +21,11 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
 from tumordetector.heads.mitigations import fit_recipe
-from tumordetector.mil.abmil import ABMIL, fit, predict_logits
+from tumordetector.mil.abmil import ABMIL, fit, predict_logits, top_instance_logits
 from tumordetector.mil.evaluate import attention_auroc, binary_metrics
 
 RI_K, RI_TILES = 10, 100        # neighbours; tiles per class per slide (as in experiment E2)
+INSTANCE_TOP = 20               # highest instance logits kept per scored slide (experiment E12)
 T_RANGE = (0.05, 20.0)
 
 
@@ -130,7 +131,7 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
     if (table.role != "dev").any():
         raise ValueError("only development slides enter the protocol: the external test is read on its own")
     t = table.set_index("slide_id")
-    runs, preds, att_scores = [], [], []
+    runs, preds, att_scores, instances = [], [], [], []
 
     def train_model(ids: list):
         bags_, labels = [bags[s] for s in ids], t.label[ids].to_numpy()
@@ -138,8 +139,10 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             return fit_recipe(bags_, labels, t.domain[ids].to_numpy(), cfg, seed, list(recipe), cfg.device)
         return fit(bags_, labels, cfg, seed, cfg.device)
 
-    def train_score(train_ids: list, test_ids: list, name: str, group: str, keep: bool = True):
-        """-> (model, logits) or (None, None) if it cannot be trained."""
+    def train_score(train_ids: list, test_ids: list, name: str, group: str, keep: bool = True,
+                    evaluation: str | None = None):
+        """-> (model, logits) or (None, None) if it cannot be trained. `evaluation`: the name the
+        slides' predictions are recorded under (default `name`), for their top instance logits."""
         info = {"group": group, "name": name, "n_train": len(train_ids), "n_test": len(test_ids),
                 "status": "ok", "reason": ""}
         if not test_ids or t.label[train_ids].nunique() < 2:
@@ -149,6 +152,10 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
         model = train_model(train_ids)
         logits, att = predict_logits(model, [bags[s] for s in test_ids], cfg.device)
         runs.append(info)
+        for sid, (v, i) in zip(test_ids, top_instance_logits(model, [bags[s] for s in test_ids], INSTANCE_TOP,
+                                                              cfg.device), strict=True):
+            instances.append(pd.DataFrame({"slide_id": sid, "evaluation": evaluation or name, "group": group,
+                                           "rank": np.arange(len(v)), "tile": i, "logit": v}))
         if keep:
             for sid, a in zip(test_ids, att, strict=True):   # localisation only where annotation is complete
                 if t.label[sid] != 1 or not t.exhaustive_annot[sid]:
@@ -165,7 +172,8 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
     oof_ids, oof_logits = [], []
     for k in sorted(table.cv_fold.unique()):
         test_ids = list(table[table.cv_fold == k].slide_id)
-        _, logits = train_score(list(table[table.cv_fold != k].slide_id), test_ids, f"fold{k}", "cv")
+        _, logits = train_score(list(table[table.cv_fold != k].slide_id), test_ids, f"fold{k}", "cv",
+                                evaluation="cv")
         if logits is not None:
             oof_ids += test_ids
             oof_logits.append(logits)
@@ -182,7 +190,7 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             fold = train.cv_fold % inner_folds == j
             ids = list(train[fold].slide_id)
             _, logits = train_score(list(train[~fold].slide_id), ids, f"held-out {c}, inner {j}", "loco-calibration",
-                                    keep=False)
+                                    keep=False, evaluation=f"held-out {c}")
             if logits is not None:
                 inner_ids += ids
                 inner_logits.append(logits)
@@ -218,8 +226,11 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
         return fn(values) if len(values) == table.center.nunique() > 1 else None
 
     att = pd.DataFrame(att_scores, columns=["slide_id", "group", "attention_auroc"])
+    inst = pd.concat(instances) if instances else pd.DataFrame(
+        columns=["slide_id", "evaluation", "group", "rank", "tile", "logit"])
     return {
-        "n_dev": int(len(table)), "runs": runs, "predictions": preds, "attention": att, "model": final,
+        "n_dev": int(len(table)), "runs": runs, "predictions": preds, "attention": att, "instances": inst,
+        "model": final,
         "temperature": temperatures.get("global"),
         "metrics": {
             "cv": metrics(cv), "cv_raw": metrics(cv, "p_raw"),
