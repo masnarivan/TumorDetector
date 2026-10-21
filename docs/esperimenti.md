@@ -20,6 +20,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 | E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
+| E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1715,3 +1716,99 @@ sensibilità micro e 0,07 di AUROC peggiore, pur guadagnando 0,08 di specificit�
 3. Per i patologi: alla soglia che garantisce il 95% di sensibilità sui centri visti, la logit del
    vetrino senza correzioni perde poche micrometastasi su un centro nuovo e dà molti falsi positivi su
    uno scanner diverso. Coerente con E10: le risposte «negativo» sono affidabili, quelle «positivo» no.
+
+## E13 — Pilota: normalizzazione del colore prima dell'embedding
+
+Protocollo fissato il 21/10/2026, dopo E12 e prima di ogni embedding di tile normalizzate. Riferimento:
+gli stessi vetrini senza normalizzazione, ri-letti con lo stesso codice.
+
+**Domanda.** E6–E12 si fermano sullo stesso punto: negli embedding Phikon lo scanner di un centro
+nuovo sposta il tessuto normale, già a livello di tile. Se il colore delle tile viene normalizzato
+**prima** dell'embedding, un rilevatore di tumore per tile addestrato su tre centri sposta meno i normali
+del quarto, senza perdere la capacità di distinguere il tumore? È il pilota che decide se rifare
+l'estrazione di tutto lo sviluppo.
+
+**Perché un pilota.** Rifare l'estrazione vuol dire riscaricare i vetrini (752 GB di CAMELYON16, 1 259 GB
+dei vetrini di sviluppo di CAMELYON17) e circa 24 ore di embedding (11 ms per tile). H-optimus-0 non è
+eseguibile in locale. Il pilota costa 143 GB di download, un vetrino alla volta, e circa un'ora di
+embedding. E4 ha già escluso la normalizzazione *negli embedding* (media del vetrino); qui la
+normalizzazione è sui pixel, prima del backbone.
+
+**Campione** (fissato ora, `experiments/data/e13_sample.csv`, generatore con seme 0). Per ogni centro di
+sviluppo 8 negativi e 3 positivi con annotazione completa; a Radboud e Utrecht divisi tra CAMELYON16 e
+CAMELYON17 (negativi 4 + 4, positivi 2 + 1): 44 vetrini, 32 negativi e 12 positivi. **LPON non viene
+letto.** Per vetrino, dalle tile già nella griglia (stesse coordinate, stesso livello di lettura di
+`td task=stream`): fino a 1 000 tile normali (`label = normal`) a caso, e nei positivi anche fino a 500
+tile tumorali (`label = tumor`); le tile di bordo escluse.
+
+**Condizioni** (stesso backbone Phikon `057cc0295895`, stessa trasformazione).
+
+1. `grezzo`: le tile come oggi. Controllo: devono coincidere con gli embedding salvati (differenza
+   massima ≤ 1e-2 in float16); se non coincidono, il pilota si ferma e il percorso di lettura va capito
+   prima.
+2. `reinhard` (Reinhard et al., 2001): media e deviazione standard per canale nello spazio Lab, stimate
+   sul **vetrino** (dalle sue tile campionate, solo pixel di tessuto) e riportate a quelle di
+   riferimento.
+3. `macenko` (Macenko et al., 2009): matrice delle colorazioni H&E e concentrazioni massime (99°
+   percentile) stimate sul **vetrino** (β = 0,15, α = 1), riportate a quelle di riferimento.
+
+**Riferimento del colore, senza il centro escluso.** Per ogni rotazione, il riferimento è la media dei
+parametri per vetrino (Lab per Reinhard; matrice e massimi per Macenko) sui vetrini del campione dei soli
+centri di training. Ogni tile ha quindi 1 embedding grezzo e 4 + 4 normalizzati (uno per rotazione e
+metodo). Implementazione propria in numpy (nessuna dipendenza nuova da far passare dal controllo delle
+licenze), con test su immagini sintetiche.
+
+**Misure, a livello di tile, leave-one-centre-out sui 4 centri** (per ogni condizione; in ogni rotazione
+gli embedding normalizzati con il riferimento di quella rotazione):
+
+- rilevatore di tumore per tile: regressione logistica come in E12 (standardizzata, L2, C = 1, classi
+  pesate), addestrata sulle tile dei 3 centri di training: tumorali dai loro positivi, normali dai loro
+  negativi. Soglia τ: lascia sopra il 95% delle tile tumorali di training;
+- sul centro escluso: specificità per tile (tile normali dei negativi sotto τ), AUROC tumore contro
+  normale per tile (positivi del centro), **spostamento dei normali** = mediana delle log-odds delle tile
+  normali dei negativi del centro escluso meno la mediana sulle tile normali dei negativi di training.
+
+**Esiti.**
+
+- Primario: specificità per tile sul centro escluso peggiore.
+- Vincolo: AUROC per tile sul centro escluso peggiore.
+- Secondari:
+  - spostamento dei normali per centro escluso;
+  - probe sul centro (come E2): AUROC macro one-vs-rest dalle tile normali dei negativi, 5 fold
+    raggruppati per vetrino, per condizione (con il riferimento della rotazione di Radboud escluso per i
+    normalizzati, fissato ora);
+  - quota dei 10 vicini (coseno) dello stesso centro, da vetrini diversi (la misura di E2);
+  - statistiche di colore per centro prima e dopo (media Lab, densità H ed E);
+  - tempo di normalizzazione per tile.
+
+Le stime per tile sono raggruppate per vetrino: una media su 8 vetrini per centro, non su 8 000 tile
+indipendenti; si riporta anche la specificità per vetrino del centro escluso (mediana sui vetrini).
+
+**Criterio** (fissato ora). Un metodo è **promettente**, e giustifica la nuova estrazione di tutto lo
+sviluppo, se rispetto a `grezzo`:
+
+1. la specificità per tile sul centro escluso peggiore sale di almeno **0,10**;
+2. l'AUROC per tile sul centro escluso peggiore non scende più di **0,01**.
+
+Se entrambi sono promettenti si sceglie quello con la specificità peggiore più alta; a parità entro 0,02,
+Reinhard (più semplice, meno parametri stimati per vetrino). Se nessuno è promettente, la normalizzazione
+del colore non va all'estrazione completa.
+
+**Che cosa decide e che cosa no.** Solo se rifare l'estrazione. Il giudizio a livello di vetrino (E6 con
+gli embedding normalizzati, e il confronto con E6) è un protocollo successivo, sull'estrazione completa.
+
+**Limiti.**
+
+- 8 negativi e 3 positivi per centro: la variabilità tra vetrini domina, e CWZ e Rijnstate hanno solo 3
+  positivi annotati da cui imparare e misurare il tumore.
+- Un rilevatore lineare sulle tile non è l'ABMIL; il pilota misura lo spostamento negli embedding, che è
+  ciò che E6–E12 indicano come causa, non le prestazioni della testa.
+- Un riferimento medio per rotazione, non uno scelto per qualità; le stime per vetrino possono fallire
+  su vetrini con poco tessuto o molta penna (GrandQC non è integrato): i fallimenti si contano e si
+  riportano.
+- Un backbone; la normalizzazione può interagire diversamente con H-optimus-0.
+
+**Codice.** `experiments/e13_stain.py` (download un vetrino alla volta con il codice di `td task=stream`,
+lettura delle tile, normalizzazioni, embedding, misure), con la normalizzazione in
+`src/tumordetector/wsi/stain.py` e i suoi test; provato su dati sintetici e committato prima
+dell'esecuzione.
