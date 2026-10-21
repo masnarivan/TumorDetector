@@ -19,7 +19,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E9 | Correzione dell'offset con pochi negativi del centro nuovo | fatto: non proponibile; specificità recuperata da k = 3, ma si perdono micrometastasi | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 | E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
-| E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | protocollo fissato | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
+| E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1663,3 +1663,55 @@ no, con l'offset di E9 e gli insiemi di E10) è un protocollo successivo, non un
   controllo qualità non rileva ancora (GrandQC non è integrato); la localizzazione serve a vederlo.
 - I tre semi rappresentano il training ABMIL e il campionamento delle tile, non la variabilità tra
   vetrini; un backbone (va rivalidato con H-optimus-0).
+
+**Risultati** (21/10/2026, codice `0f9f02f` per l'analisi, `6d08eb7` per la riesecuzione di E6 con le
+logit d'istanza: 5 ore e 33 minuti; classificatore di tile 6 minuti, 48 modelli; risultati in
+`data/reports/experiments/e12/summary.md`). **Controllo superato**: le logit del vetrino della riesecuzione
+coincidono con E6 (differenza 0 su 4626 righe), quindi registrare le istanze non cambia il modello.
+
+k = 5, soglia τ dai centri di training, media sui tre semi:
+
+| | Logit del vetrino | Istanza ABMIL | Classificatore di tile |
+|---|---|---|---|
+| **Sensibilità micro, centro peggiore** | 0,846 (Rijnstate) | 0,872 (Rijnstate) | 0,711 (Utrecht) |
+| **Specificità, centro peggiore** | 0,606 (Utrecht) | **0,238** (Utrecht) | 0,684 (Radboud) |
+| AUROC, centro peggiore | 0,976 | 0,968 | 0,908 |
+| Mediana dei negativi, Utrecht escluso (training) | −0,71 (−6,74) | 2,71 (−1,59) | 2,03 (3,16) |
+| Mediana dei negativi, CWZ escluso (training) | −2,51 (−7,51) | 0,70 (−1,52) | 6,02 (3,83) |
+| Localizzazione (una delle 5 tile più alte è tumore) | — | 0,83–0,94 | 0,75–0,94 |
+
+**Esito secondo il criterio: nessun segnale candidato.** L'istanza ABMIL guadagna 0,03 di sensibilità
+micro (serve 0,10) e perde 0,37 di specificità peggiore; il classificatore di tile perde 0,14 di
+sensibilità micro e 0,07 di AUROC peggiore, pur guadagnando 0,08 di specificità.
+
+**Lettura** (oltre il criterio, quindi ipotesi).
+
+- **Con la soglia dai centri di training, la logit del vetrino trova già le micrometastasi** di un centro
+  nuovo: sensibilità micro tra 0,85 e 0,97, persa solo a Rijnstate (2 vetrini su 13 in tutti i semi, gli
+  stessi di E10, uno è del punto cieco). La perdita di micrometastasi di E9–E11 era l'effetto della
+  correzione dell'offset, non un limite della logit. Il problema della logit resta la specificità
+  (Utrecht 0,61, con un seme a 0,006).
+- **Le logit d'istanza dell'ABMIL sono più spostate della logit del vetrino**: i negativi di Utrecht
+  salgono di 4,3 (contro 6,0 della logit del vetrino, su una scala più stretta) e le 5 tile più alte di un
+  vetrino negativo di un centro nuovo superano la soglia nel 76% dei casi. L'ABMIL non impara un
+  rilevatore di tumore per tile, ma un punteggio che porta anche il centro, e il massimo su migliaia di
+  tile lo amplifica. Con k = 20 la specificità di Utrecht è 0,004.
+- **Il classificatore supervisionato è meno spostato, ma in direzioni diverse per centro**: i negativi
+  salgono a CWZ (+2,2) e Radboud (+1,9) e **scendono** a Utrecht (−1,1). A Utrecht, scanner Hamamatsu
+  mai visto quando è escluso, scende tutto, anche il tumore: sensibilità micro 0,71. È E2 a livello di
+  tile: il centro è leggibile da una tile, e qualunque punteggio imparato sui centri di training si sposta
+  su uno scanner nuovo, in una direzione che non si conosce prima.
+- **Le tile più alte sono quasi sempre tumore** (localizzazione 0,83–0,94 per l'istanza ABMIL): sui
+  positivi entrambi i punteggi guardano il posto giusto. Il problema sono le tile più alte dei negativi.
+
+**Conseguenze.**
+
+1. Nessun punteggio dalle tile entra in un protocollo di combinazione: non c'è un segnale da combinare.
+2. Dopo E6–E12, ricette di training, correzioni a valle e punteggi dalle tile si fermano sullo stesso
+   punto: negli embedding Phikon lo scanner di un centro nuovo sposta il tessuto normale, a livello di
+   vetrino e di tile. La leva che resta è a monte del modello: il backbone (H-optimus-0, previsto per
+   l'MVP e addestrato su più centri e scanner) o la normalizzazione del colore prima dell'embedding;
+   entrambe richiedono una nuova estrazione.
+3. Per i patologi: alla soglia che garantisce il 95% di sensibilità sui centri visti, la logit del
+   vetrino senza correzioni perde poche micrometastasi su un centro nuovo e dà molti falsi positivi su
+   uno scanner diverso. Coerente con E10: le risposte «negativo» sono affidabili, quelle «positivo» no.
