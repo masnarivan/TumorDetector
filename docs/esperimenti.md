@@ -18,6 +18,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E8 | Discriminatore avversariale del dominio nella testa (DANN), su tutti i vetrini o solo sui negativi | fatto: nessuna adottata; corregge Utrecht, rompe CWZ | se l'invarianza della rappresentazione corregge i negativi di uno scanner nuovo |
 | E9 | Correzione dell'offset con pochi negativi del centro nuovo | fatto: non proponibile; specificità recuperata da k = 3, ma si perdono micrometastasi | quanti vetrini negativi di un centro nuovo servono per riportarne la specificità vicino ai centri visti; dato per la decisione con i patologi |
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
+| E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | protocollo fissato | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1397,3 +1398,110 @@ dei positivi ≥ 0,90 su ogni centro escluso); «per classe» ha meno rinvii sul
    combinazione offset + conformal con k = 20 negativi è il protocollo naturale dopo E9.
 3. Da portare ai patologi: con un'installazione senza vetrini locali, le risposte «negativo» sono
    affidabili su ogni centro misurato (micrometastasi a parte), quelle «positivo» no.
+
+## E11 — Offset e insiemi conformal insieme
+
+Protocollo fissato il 21/10/2026, dopo i risultati di E9 ed E10 e prima di ogni calcolo che li
+combini. Riferimenti: E10 «per classe» (la variante scelta) ed E9 `offset solo in discesa`.
+
+**Domanda.** E9 riporta i negativi di un centro nuovo al livello dei centri visti con pochi vetrini, ma
+alla soglia 0,5 perde sensibilità, quasi tutta micrometastasi; E10 garantisce la copertura dei positivi
+ma lascia i negativi spostati di Utrecht come risposte «positivo». Applicando gli insiemi conformal «per
+classe» alle logit **corrette** dall'offset, le micrometastasi perse da E9 diventano **rinvii** invece di
+risposte «negativo», mantenendo il guadagno di specificità di E9? Quanti rinvii costa?
+
+**Ipotesi** (dai risultati di E9, quindi dichiarata come tale). Dopo la correzione i negativi stanno
+intorno a −7 e le micrometastasi perse intorno a 0: una probabilità vicina a 0,5, che gli insiemi per
+classe dovrebbero mettere in `{0, 1}`.
+
+**Scelte prese dai risultati precedenti** (dichiarate: non sono a priori). La variante dell'offset è
+`solo in discesa`, l'unica che regge il trasferimento tra dataset di Radboud in E9. La variante conformal
+è «per classe», scelta in E10. Nessun'altra combinazione entra in questo esperimento.
+
+**Dati.** La riesecuzione di E6 di E10 (`data/reports/experiments/e10/e6/predictions.csv`), con le logit
+LOCO del centro escluso, le logit dei fold interni dei centri di training (`loco-calibration`) e la
+temperatura di ogni rotazione. Nessun nuovo training; LPON non viene letto. Positivi per centro
+(macro / micro): CWZ 12 / 23, Radboud 60 / 60, Rijnstate 19 / 13, Utrecht 50 / 38.
+
+**Procedura**, per ogni seme, rotazione, k ∈ {3, 5, 10, 20} e una di 200 estrazioni di k negativi del
+centro escluso (generatore con seme 0, estrazioni nuove rispetto a E9):
+
+1. offset come in E9: b' = max(mediana dei k negativi − m_ref, 0), con m_ref = mediana dei negativi nei
+   fold interni della rotazione;
+2. probabilità corrette degli altri vetrini del centro: p = sigmoide((logit − b') / *T*);
+3. insiemi conformal come in E10, con il punteggio s = 1 − p(y) e i quantili per classe.
+
+Due varianti, che differiscono solo per il quantile dei negativi q₀:
+
+1. `offset + per classe`: q₀ e q₁ dai fold interni dei centri di training, come in E10 (non dipendono
+   dall'estrazione). Tutti i k.
+2. `offset + per classe, negativi locali`: q₁ come sopra; q₀ dai k negativi estratti, con le loro logit
+   corrette. Solo k = 20, perché per α = 0,05 servono almeno 19 vetrini (con k < 19 l'indice del quantile
+   supera n e il negativo entra in ogni insieme).
+
+Ogni estrazione si valuta sugli altri vetrini del centro (tutti i positivi e i negativi non estratti).
+Esito per vetrino come in E10: `{1}` risposta positivo, `{0}` risposta negativo, `{0, 1}` e `{}` rinvio
+(per due classi l'insieme vuoto è un altro caso di incertezza, nota di E10).
+
+Livelli: α = 0,05 (principale), α = 0,10.
+
+**Riferimenti, sugli stessi vetrini di valutazione di ogni estrazione.** E10 «per classe» senza offset;
+E9 `offset solo in discesa` alla soglia 0,5; E6 alla soglia 0,5.
+
+**Esiti** (media sulle 200 estrazioni, poi sui tre semi; per centro escluso).
+
+- Primari:
+  - **tumori persi** (positivi con risposta `{0}`) su ogni centro escluso, e la quota non persa
+    (1 − tumori persi) accanto alla sensibilità dello stesso centro visto in training (CV di E6);
+  - negativi con risposta `{1}` sul centro escluso peggiore, accanto a E10 «per classe».
+- Vincoli e costo:
+  - copertura dei positivi su ogni centro escluso;
+  - tasso di rinvio per centro escluso;
+  - 10° percentile sulle estrazioni dei negativi con risposta `{1}`, sul centro peggiore di E10
+    «per classe».
+- Secondari:
+  - tumori persi e rinvii separati per micrometastasi e macrometastasi (`reference_diagnosis` del
+    cohort);
+  - copertura dei negativi, dimensione media dell'insieme, errore sulle risposte;
+  - alla prevalenza, con la griglia di E10 (π ∈ {0,05; 0,10; 0,20; 0,30} e quella del cohort): rinvii,
+    PPV e NPV;
+  - α = 0,10.
+
+**Criterio** (fissato ora). A α = 0,05, una variante con un dato k è **proponibile** se, in media su
+estrazioni e semi:
+
+1. la copertura dei positivi è ≥ 0,90 su ogni centro escluso (la regola di E10);
+2. su ogni centro escluso la quota di positivi non persi è almeno la sensibilità dello stesso centro
+   visto in training meno 0,05 (il vincolo di E9, dopo la modifica);
+3. i negativi con risposta `{1}` sul centro peggiore sono almeno **0,10** sotto quelli di E10 «per
+   classe» sugli stessi vetrini;
+4. il 10° percentile dei negativi con risposta `{1}` sul centro peggiore di E10 «per classe» non supera
+   il valore di E10 su quel centro (un'estrazione sfortunata non peggiora rispetto a non correggere);
+5. il tasso di rinvio di nessun centro escluso supera di più di **0,10** quello di E10 «per classe» sullo
+   stesso centro.
+
+Il quinto vincolo esclude la soluzione banale (rinviare tutto). Il tasso di rinvio accettabile in
+assoluto resta una decisione dei patologi, sui numeri alla prevalenza.
+
+Per ogni variante si riporta il k minimo proponibile; si propone la combinazione con k minore, a parità
+di k la variante 1 (non richiede quantili locali).
+
+**Che cosa decide.** Come E9, misura. Usare vetrini del centro all'installazione resta una decisione dei
+patologi (rivede "solo calibrazione globale"). Se una combinazione è proponibile, i numeri da portare
+sono: quanti negativi confermati servono, quanti rinvii, quante micrometastasi restano risposte
+«negativo».
+
+**Limiti.**
+
+- Gli stessi di E9 (negativi estratti dagli stessi vetrini storici del leave-one-centre-out, un solo
+  spostamento additivo) ed E10 (scambiabilità violata sul centro nuovo, punteggi di calibrazione dai
+  modelli dei fold interni).
+- I quantili della variante 1 vengono dai centri di training: dopo la correzione il centro nuovo ha lo
+  stesso livello dei negativi, non necessariamente la stessa dispersione.
+- Pochi positivi per centro e ancora meno micrometastasi (Rijnstate 13): il sottogruppo micro è
+  descrittivo.
+- Tre semi, quattro rotazioni, un backbone (va rivalidato con H-optimus-0).
+
+**Codice.** Il calcolo sarà in `experiments/e11_offset_conformal.py`, che riusa le funzioni di
+`e9_offset.py` ed `e10_conformal.py`; lo script si prova su dati sintetici e si committa prima di
+eseguirlo.
