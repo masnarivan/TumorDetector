@@ -23,14 +23,12 @@ def external_mask(spec, rows: pd.DataFrame) -> np.ndarray:
 
 
 def run(cfg: DictConfig):
-    import mlflow
     import torch
 
     from tumordetector.embed import store
     from tumordetector.heads.cohort import cohort_path, embedding_roots
-    from tumordetector.heads.protocol import sigmoid
     from tumordetector.heads.spec import HeadSpec
-    from tumordetector.mil.abmil import predict_logits
+    from tumordetector.serve import registry
     from tumordetector.serve.answer import answer
 
     spec = HeadSpec(**OmegaConf.to_container(cfg.head, resolve=True))
@@ -56,25 +54,7 @@ def run(cfg: DictConfig):
     dev = set(pd.read_csv(path).query("role == 'dev'").slide_id) if path.exists() else set()
 
     model_name = f"head-{spec.id}-{cfg.backbone.name}"
-    mlflow.set_tracking_uri(cfg.mlflow.tracking_uri)
-    client = mlflow.MlflowClient()
-    try:
-        version = client.get_model_version_by_alias(model_name, p.alias)
-    except mlflow.exceptions.MlflowException as e:
-        raise SystemExit(f"no version of {model_name} with alias {p.alias!r}") from e
-    tags = version.tags
-    if tags.get("collection") != ident["collection"]:
-        raise SystemExit(f"{model_name} v{version.version} was trained on {tags.get('collection')}, "
-                         f"the slides are embedded with {ident['collection']}")
-    if "conformal_q0" not in tags or tags["conformal_q0"] == "None":
-        raise SystemExit(f"{model_name} v{version.version} has no conformal sets: train it again")
-    temperature, q0, q1 = (float(tags[k]) for k in ("temperature", "conformal_q0", "conformal_q1"))
-    validated = "validated" in client.get_registered_model(model_name).aliases and \
-        client.get_model_version_by_alias(model_name, "validated").version == version.version
-    centers, scanners = set(tags.get("centers", "").split(",")), set(tags.get("scanners", "").split(","))
-    model = mlflow.pytorch.load_model(f"models:/{model_name}@{p.alias}", map_location="cpu")
-    if hasattr(model, "module"):   # "pt2" (MLflow 3): an exported graph, traced in eval mode; its callable form
-        model = model.module()
+    head = registry.load(cfg.mlflow.tracking_uri, model_name, ident["collection"], alias=p.alias)
     torch.set_num_threads(cfg.mil.threads)
 
     out = Path(p.out) if p.out else Path(cfg.paths.out) / "reports" / cfg.backbone.name / "predictions" / spec.id
@@ -82,22 +62,20 @@ def run(cfg: DictConfig):
     code = code_version()
     for r in rows.itertuples():
         slide = store.read_slide(roots[r.dataset], r.slide_id)
-        logits, att = predict_logits(model, [slide.features], "cpu")
-        logit = float(logits[0])
-        prob = float(sigmoid(np.array(logit / temperature)))
-        a = answer(prob, q0, q1, validated, r.center in centers if p.seen_only else None,
-                   r.scanner in scanners if p.seen_only else None)
-        top = np.argsort(-att[0])[:p.top_tiles]
+        logit, prob, att = head.score(slide.features)
+        a = answer(prob, head.q0, head.q1, head.validated, r.center in head.centers if p.seen_only else None,
+                   r.scanner in head.scanners if p.seen_only else None)
+        top = np.argsort(-att)[:p.top_tiles]
         result = {
             "slide_id": r.slide_id, "dataset": r.dataset, "center": r.center, "scanner": r.scanner,
-            "head": f"{spec.id} v{spec.version}", "model": model_name, "model_version": int(version.version),
-            "alias": p.alias, "validated": validated, "collection": ident["collection"], "code_version": code,
-            "logit": logit, "temperature": temperature, "probability": prob,
-            "conformal": {"alpha": float(tags.get("conformal_alpha", "nan")), "q0": q0, "q1": q1},
+            "head": f"{spec.id} v{spec.version}", "model": model_name, "model_version": head.version,
+            "alias": p.alias, "validated": head.validated, "collection": ident["collection"], "code_version": code,
+            "logit": logit, "temperature": head.temperature, "probability": prob,
+            "conformal": {"alpha": head.alpha, "q0": head.q0, "q1": head.q1},
             **a,
             "in_development": r.slide_id in dev,   # a training slide of this version: not an independent answer
             "top_tiles": [{"tile": int(i), "x": int(slide.tiles.x.iloc[i]), "y": int(slide.tiles.y.iloc[i]),
-                           "attention": float(att[0][i])} for i in top],
+                           "attention": float(att[i])} for i in top],
         }
         write_json(out / f"{r.slide_id}.json", result)
         why = f" ({'; '.join(a['reasons'])})" if a["reasons"] else ""

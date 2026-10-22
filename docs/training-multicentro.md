@@ -12,7 +12,16 @@ risultati, con le soglie di adozione.
 nessuna ricetta di training o correzione a valle lo risolve senza vetrini del centro (*Stato dopo
 E6–E12*, sotto). Proposta nuova: un centro entra nella pipeline con i propri vetrini diagnosticati
 (*Ingresso di un centro nuovo*), con il costo d'ingresso misurato da E14. Il test esterno su LPON non è
-stato consultato. Manca ancora il task del test esterno.
+stato consultato.
+
+*Aggiornamento del 22/10/2026, pomeriggio.* Implementati, senza ancora una versione che li usi (la v1
+registrata è di prima): insiemi conformal per classe nella testa (`conformal.json`, tag del registry) con la
+copertura dei positivi sul centro escluso peggiore nel gate (≥ 0,90; su E6 sarebbe 0,91–0,94); centri e
+scanner visti come tag della versione; `td task=predict` (probabilità, insieme, decisione con tutti i motivi
+di rinvio, tile con più attenzione; rinvia centri e scanner non visti e versioni non validate; rifiuta il
+test esterno); `td task=external` (solo la versione `validated`, una volta, riga nel registro
+`data/reports/external_log.csv` scritta prima di leggere gli embedding; rinvio come centro non visto e
+risposte "al giorno zero", per scanner).
 
 ## Decisioni (18/10/2026)
 
@@ -378,6 +387,9 @@ src/tumordetector/
   tasks/train.py         td task=train head=<id>
   tasks/splits.py        td task=splits head=<id>
   tasks/external.py      td task=external head=<id> version=<n>
+  (22/10/2026) heads/conformal.py   insiemi per classe (E10)
+  (22/10/2026) serve/answer.py      positivo / negativo / rinvio con i motivi; serve/registry.py: versione dal registry
+  (22/10/2026) tasks/predict.py     td task=predict head=<id> predict.slides=[...]
 conf/
   head/ln_metastasis.yaml
   mitigation/{balanced,group_dro,stat_mix}.yaml

@@ -4,7 +4,7 @@ defaults:
   - head: ln_metastasis
   - _self_
 
-task: ???            # manifest | tile | embed | index | stream | splits | cohort | train | train_head | predict
+task: ???            # manifest | tile | embed | index | stream | splits | cohort | train | train_head | predict | external
 seed: 0
 
 paths:
@@ -69,6 +69,10 @@ predict:             # td task=predict: the answer of a registered head for embe
   seen_only: true    # refer slides of a centre or scanner the version has not seen (proposed 22/10/2026)
   top_tiles: 10      # tiles with most attention in the answer
   out: null          # null = data/reports/<backbone>/predictions/<head>
+
+external:            # td task=external: the locked external test of a head, once per validated version
+  version: null      # model version to test: it must hold the 'validated' alias
+  log: data/reports/external_log.csv   # one row per consultation, versioned in git, written before reading
 
 gate:                # promotion battery: initial proposals, to be agreed with the pathologists
   min_slides: 100    # below this a run only checks that the code works

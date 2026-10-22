@@ -288,6 +288,13 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     a = read_json(answers / "a01.json")
     assert a["decision"] == "rinvio" and a["reasons"][0].startswith("versione non validata") and a["in_development"]
     assert 0 < a["probability"] < 1 and len(a["top_tiles"]) == 10 and a["conformal"]["q1"] == conformal["q1"]
+    monkeypatch.setattr("tumordetector.tasks.external.dataset_cfg", cfgs.__getitem__)
+    ext = ["task=external", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}", f"mlflow.tracking_uri={uri}",
+           f"external.log={tmp_path / 'external_log.csv'}"]
+    loaded.clear()
+    with pytest.raises(SystemExit, match="validated"):                 # a candidate never consults it
+        cli.main([*ext, f"external.version={version.version}"])
+    assert not [s for s in loaded if s.startswith("z")] and not (tmp_path / "external_log.csv").exists()
     client.set_registered_model_alias("head-ln_metastasis-dummy", "validated", version.version)
     client.set_model_version_tag("head-ln_metastasis-dummy", version.version, "centers", "b,c,d")
     cli.main([*pred, "predict.slides=[a01,c03]"])
@@ -295,6 +302,19 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert a["validated"] and a["decision"] == "rinvio" and "centro non visto" in a["reasons"][0]
     assert not any(r.startswith("versione non validata") or "non visto" in r for r in c["reasons"])
     assert (c["decision"] == "rinvio") == bool(c["reasons"]) and (c["decision"] == "positivo") == (c["set"] == [1])
+
+    # td task=external: only the validated version, once, logged before reading; the external slides are read now
+    with pytest.raises(SystemExit, match="which version"):
+        cli.main(ext)
+    loaded.clear()
+    cli.main([*ext, f"external.version={version.version}"])
+    assert sorted(s for s in loaded if s.startswith("z")) == [f"z{i:02d}" for i in range(10)]
+    log = pd.read_csv(tmp_path / "external_log.csv")
+    assert log.status.tolist() == ["conclusa"] and log.referral_unseen.iloc[0] == 1.0   # centre z never seen
+    report = (tmp_path / f"out/reports/dummy/external/ln_metastasis/v{version.version}/report.md").read_text()
+    assert "Giorno zero" in report and "scanner s" in report
+    with pytest.raises(SystemExit, match="once per version"):
+        cli.main([*ext, f"external.version={version.version}"])
 
     # a relabelled manifest no longer matches the cohort: training refuses
     manifest.assign(reference_diagnosis="negative").pipe(lambda m: m[m.dataset == "d1"]).to_csv(
