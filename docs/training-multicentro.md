@@ -7,6 +7,13 @@ training della testa senza mitigazioni con temperatura globale, probe e Robustne
 protocolli degli esperimenti (E6, E7) passano in [esperimenti.md](esperimenti.md) prima di vedere i
 risultati, con le soglie di adozione.
 
+*Aggiornamento del 22/10/2026.* Fatti E6–E12; implementate anche le ricette `balanced`, `group_dro`,
+`stat_mix` e `adversarial`. **Nessuna versione supera il gate**: il centro mai visto resta il problema, e
+nessuna ricetta di training o correzione a valle lo risolve senza vetrini del centro (*Stato dopo
+E6–E12*, sotto). Proposta nuova: un centro entra nella pipeline con i propri vetrini diagnosticati
+(*Ingresso di un centro nuovo*), con il costo d'ingresso misurato da E14. Il test esterno su LPON non è
+stato consultato. Manca ancora il task del test esterno.
+
 ## Decisioni (18/10/2026)
 
 | Tema | Decisione |
@@ -19,6 +26,12 @@ risultati, con le soglie di adozione.
 | Robustezza nel gate | Robustness Index ≥ 0,5. Probe sul centro: soglia ≤ 0,80 fino a E8, poi (19/10) solo riportato, con la regola di non superare il probe del modello `validated` di oltre 0,01 |
 | Test esterno | Bloccato dal codice: una consultazione per versione, solo versioni `validated` |
 | Punto cieco della griglia | Non prioritario: griglia invariata, i vetrini noti riportati come sottogruppo |
+
+Revisione proposta il 22/10/2026, da decidere (non ancora una decisione): la riga *Calibrazione* resta
+com'è per la temperatura, ma il requisito "il modello deve reggere su un centro nuovo senza vetrini di
+quel centro" non è raggiungibile con Phikon (E6–E12). La proposta è sostituirlo con: **un centro riceve
+risposte diagnostiche solo dopo essere entrato nello sviluppo con i propri vetrini**; fino ad allora i
+suoi vetrini vanno in rinvio. Dettagli in *Ingresso di un centro nuovo*.
 
 ## Da dove partiamo
 
@@ -45,6 +58,37 @@ Dati disponibili per la testa linfonodo (ITC escluse dal binario, come già stab
 | Rijnstate | 3DHistech | — | 60 / 32 | 92 |
 | LPON | Philips (5 scanner) | — | 61 / 31 | 92 |
 
+## Stato dopo E6–E12 (22/10/2026)
+
+Dettagli e numeri in [esperimenti.md](esperimenti.md).
+
+| Esperimento | Che cosa ha provato | Esito |
+|---|---|---|
+| E6 | Quattro centri, ricetta vuota, temperatura globale | Gate non superato. Sul centro escluso i **negativi** salgono verso il tumore (Utrecht: logit mediana +0,1 contro −8 in CV, specificità 0,49); i positivi restano dove sono |
+| E7 | `balanced`, `group_dro`, `stat_mix` | Nessuna adottata: l'errore si sposta tra centri |
+| E8 | Discriminatore avversariale (DANN) | Nessuna adottata: corregge Utrecht, rompe CWZ |
+| E9 | Offset dai negativi del centro nuovo | Specificità recuperata da 3 negativi (Utrecht 0,49 → 0,97), ma si perdono micrometastasi (sensibilità −0,08 rispetto al centro visto) |
+| E10 | Insiemi conformal e rinvio | Scelta «per classe»: le risposte «negativo» reggono su ogni centro, i falsi positivi di Utrecht restano positivi sicuri |
+| E11 | Offset + conformal | Non proponibile: dopo l'offset le micrometastasi perse sono negativi chiari, non incerti |
+| E12 | Punteggi dalle tile (istanze ABMIL, classificatore di tile) | Nessun candidato: anche le tile portano lo spostamento di centro |
+| E13 | Normalizzazione del colore prima dell'embedding (pilota) | Protocollo fissato, in pausa dopo E14 |
+| E14 | Vetrini del centro nuovo aggiunti al training | Protocollo fissato |
+
+Che cosa se ne ricava:
+
+- **Un centro visto funziona.** In CV di E6, dove ogni centro contribuisce l'80% dei suoi vetrini al
+  training: specificità 0,94–0,98, sensibilità 0,92–0,99, su ogni centro. Il problema non è un modello
+  debole ma un modello che non ha mai visto quello scanner.
+- **Senza vetrini del centro le leve sono esaurite**: ricette di training, temperatura, offset,
+  conformal, punteggi dalle tile si fermano tutti sullo stesso spostamento del tessuto normale.
+- **Restano due strade, complementari**: cambiare il segnale a monte (normalizzazione del colore, E13;
+  H-optimus-0, che non gira in locale) o far vedere il centro al modello (E14). La prima riduce il costo
+  della seconda, non la sostituisce: anche con un backbone migliore un centro nuovo resta un dominio
+  nuovo da verificare.
+- **Le micrometastasi sono il punto debole** di ogni correzione: vanno nella batteria come sottogruppo.
+- **Riconoscere un centro mai visto è facile** (E2: il centro si legge dagli embedding con AUROC 1,000):
+  il sistema può accorgersene e rinviare invece di sbagliare.
+
 ## Principi
 
 1. **Più centri prima di qualunque trucco.** La prima misura è il baseline invariato addestrato su
@@ -59,6 +103,8 @@ Dati disponibili per la testa linfonodo (ITC escluse dal binario, come già stab
 4. **Il centro peggiore decide**, come nel gate di oggi. Le mitigazioni che ottimizzano il caso
    peggiore (Group DRO) sono coerenti con il criterio di promozione.
 5. **Il test esterno si consulta una volta per candidato**, e il codice lo impedisce altrimenti.
+6. *(Proposto il 22/10/2026.)* **Un centro mai visto non riceve risposte diagnostiche.** Una versione è
+   `validated` per i centri e gli scanner del suo sviluppo; per gli altri il risultato è un rinvio.
 
 ## Architettura
 
@@ -188,6 +234,67 @@ rinvio OOD, non una ricalibrazione locale.
 E4 suggeriva la ricalibrazione per centro: scartata qui. Resta possibile come esperimento solo
 diagnostico, per capire quanta parte dell'errore è una scala dei punteggi.
 
+*Nota del 22/10/2026.* E6 ha mostrato che l'errore sul centro nuovo non è di scala ma di livello dei
+soli negativi; E9 ha provato la correzione con i vetrini del centro (offset), che perde micrometastasi.
+La proposta di *Ingresso di un centro nuovo* non è una ricalibrazione locale: il centro entra nello
+sviluppo e la testa si riaddestra; la temperatura resta una e globale.
+
+## Ingresso di un centro nuovo (proposta, 22/10/2026)
+
+Da discutere con i patologi; la parte quantitativa la dà E14. Il backbone congelato e le teste piccole
+rendono il riaddestramento economico (ore di CPU), quindi il modello può crescere con i centri che lo
+usano.
+
+```
+ vetrino ──► M3 / OOD: centro o scanner visto? ──no──► rinvio (nessuna risposta diagnostica)
+                    │ sì                                      │
+                    ▼                                         ▼
+          risposta della versione validated        uso silente: il sistema gira, il patologo
+          (probabilità, insiemi per classe E10)    non vede l'output; la sua diagnosi è l'etichetta
+                                                              │ raggiunto il costo d'ingresso (E14)
+                                                              ▼
+                                       il centro entra nel cohort di sviluppo (nuovo dominio, nuovi fold)
+                                                              │
+                                                              ▼
+                                       riaddestramento + protocollo della testa (CV, leave-one-centre-out)
+                                                              │ gate superato
+                                                              ▼
+                                       registry: nuova versione, validated per i centri del suo sviluppo
+```
+
+1. **Riconoscere il centro nuovo.** Il centro è nei metadati del vetrino; lo scanner anche, ma un cambio
+   di colorazione o di protocollo no. Serve quindi anche un controllo sugli embedding (il centro si legge
+   con AUROC 1,000, E2; E3b ha mostrato che un punteggio OOD sulla composizione del tessuto non basta).
+2. **Uso silente.** Già previsto dal piano. In istopatologia ogni vetrino è comunque letto dal patologo:
+   le etichette del vetrino sono complete, senza bias di selezione, e non servono annotazioni (l'ABMIL
+   impara dalle etichette del vetrino). La diagnosi va confermata e registrata con la mappa delle etichette
+   della testa (ITC escluse).
+3. **Ingresso nel cohort.** I vetrini del centro diventano un dominio di sviluppo: nuovi fold per
+   paziente, file degli split versionato rigenerato **esplicitamente** con una nuova versione (mai in modo
+   implicito), il resto dei fold invariato.
+4. **Riaddestramento e gate.** Il protocollo della testa intero. Il leave-one-centre-out guadagna una
+   rotazione per ogni centro: misura ancora la generalizzazione a un centro nuovo, che resta il caso del
+   prossimo ingresso.
+5. **Registry.** I tag della versione includono già i domini visti; diventano anche la **lista dei centri
+   e degli scanner per cui la versione può rispondere**. Il servizio d'inferenza la legge e rinvia gli
+   altri.
+6. **Monitoraggio.** Un centro non è un dominio fisso (E3b: i casi di Radboud del 2015). Sui centri
+   ammessi si confrontano le distribuzioni delle logit dei negativi confermati con quelle dello sviluppo
+   (lo spostamento di E6 si vede già da 3 negativi, E9); uno spostamento riporta il centro al punto 1.
+7. **Test esterno.** LPON resta bloccato e non entra mai in questo ciclo: misura una sola volta la
+   generalizzazione di una versione, non l'ingresso di un centro.
+
+Vincoli da risolvere fuori dal codice:
+
+- **Regolatorio.** Un modello che si aggiorna è un dispositivo che cambia. Il percorso va descritto in
+  anticipo come piano di modifica (in USA i *Predetermined Change Control Plan* della FDA; in Europa MDR
+  e AI Act): che cosa può cambiare (pesi della testa, centri ammessi), con quale protocollo, con quale
+  gate. Il modo di lavorare del progetto (protocollo prima dei risultati, gate automatico, report
+  allegato alla versione) è già in quella forma.
+- **Dati.** Accordi con i centri, DPIA, GDPR. Gli embedding possono restare nel centro: una testa ABMIL si
+  può anche addestrare in modo federato, da valutare quando ci sarà un secondo centro reale.
+- **Il primo periodo in un centro nuovo** non dà risposte diagnostiche: va concordato e comunicato.
+
 ### Protocollo e batteria
 
 Il protocollo di oggi resta (CV, leave-one-centre-out, più semi, gate sulla media) con queste
@@ -228,6 +335,9 @@ quando ci sarà una seconda testa, con un esperimento che lo confronti con le ri
 adottato, avrebbe una collezione di embedding propria, come uno studente distillato.
 
 ## Esperimenti (bozze di protocollo)
+
+*Nota del 22/10/2026.* E6 ed E7 sono stati fatti con i protocolli in [esperimenti.md](esperimenti.md),
+seguiti da E8–E14; le bozze qui sotto restano come scritte il 18/10.
 
 Tutti con Phikon (embedding già estratti per 899 vetrini), tre semi, stessi split. La ricetta scelta
 va **rivalidata con H-optimus-0**: quanto il centro è codificato dipende dal backbone.
@@ -275,3 +385,8 @@ conf/
 
 Ordine di lavoro: manifest (paziente unificato, `normal_144`) → cohort e split → calibrazione
 globale, probe e RI nel protocollo → E6 → mitigazioni ed E7 → esterno su LPON.
+
+Ordine dal 22/10/2026: E14 → decisione con i patologi sull'ingresso dei centri (e sullo scambio
+specificità / micrometastasi di E9–E11) → E13 se E14 lo chiede → insiemi per classe di E10 nell'output
+della testa e nel gate → lista dei centri ammessi nel registry e rinvio dei centri non ammessi →
+esterno su LPON solo con una versione che passa il gate.

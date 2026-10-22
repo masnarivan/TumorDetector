@@ -20,7 +20,8 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E10 | Insiemi conformal e rinvio al patologo sul centro escluso: marginale, per classe, per classe × centro | fatto: scelta «per classe»; le risposte negative reggono, i falsi positivi di Utrecht no | se la testa può dichiarare l'incertezza su un centro nuovo con copertura garantita, e a quale costo in rinvii |
 | E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
-| E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
+| E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
+| E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1812,3 +1813,124 @@ gli embedding normalizzati, e il confronto con E6) è un protocollo successivo, 
 lettura delle tile, normalizzazioni, embedding, misure), con la normalizzazione in
 `src/tumordetector/wsi/stain.py` e i suoi test; provato su dati sintetici e committato prima
 dell'esecuzione.
+
+## E14 — Quanti vetrini di un centro nuovo servono nel training
+
+Protocollo fissato il 22/10/2026, dopo E13 (protocollo) e prima di ogni addestramento con vetrini del
+centro escluso. Riferimenti: E6 (stessa ricetta, vuota), E9 (offset con i negativi del centro). E13 resta
+fissato ma in pausa: viene dopo E14 (motivo nella *Lettura* qui sotto).
+
+**Domanda.** E6–E12 mostrano che un centro *visto* in training si comporta bene (CV di E6: specificità
+0,94–0,98, sensibilità 0,92–0,99) e uno *mai visto* no (Utrecht escluso: specificità 0,49), e che nessuna
+ricetta di training o correzione a valle, senza vetrini del centro, chiude la distanza. Una pipeline che
+nel tempo raccoglie vetrini diagnosticati da centri nuovi (uso silente, M9) e li rimette nel training
+la chiude per costruzione, *se* ne bastano pochi. **Quanti vetrini con diagnosi di un centro nuovo,
+aggiunti al training dell'ABMIL, servono perché quel centro si comporti come un centro visto?** E rende
+di più riaddestrare con quei vetrini o usarne i negativi per l'offset di E9?
+
+**Che cosa decide e che cosa no.** E14 misura il costo d'ingresso di un centro nella pipeline: quanti
+casi di uso silente prima che il centro riceva risposte. Non decide l'adozione del percorso (accordi sui
+dati, regole sugli aggiornamenti del modello: progetto in
+[training-multicentro.md](training-multicentro.md), *Ingresso di un centro nuovo*), né rivede da solo la
+decisione "solo calibrazione globale": il centro entra nello sviluppo, non viene ricalibrato.
+
+**Dati.** Cohort `ln_metastasis` v1, 771 vetrini di sviluppo, Phikon `057cc0295895`. LPON non viene
+letto. Le etichette usate sono solo quelle del vetrino (`reference_diagnosis` → `label`), come quelle che
+darebbe il patologo nell'uso silente: nessuna annotazione.
+
+**Estrazioni.** Per ogni centro *c* (le 4 rotazioni del leave-one-centre-out) e per ogni estrazione
+d ∈ {0, 1, 2} (generatore con seme 0, fissato): una permutazione casuale dei **pazienti** di *c* (un
+paziente ha fino a 5 vetrini in CAMELYON17; i pazienti di CAMELYON16 e 17 dello stesso centro si trattano
+come distinti, C17 §3). Per n ∈ {5, 10, 20, 40}, i vetrini aggiunti sono quelli dei primi pazienti della
+permutazione finché se ne contano almeno n (il numero esatto e i positivi tra essi si riportano). Le
+estrazioni sono **annidate**: i vetrini di n = 5 stanno in quelli di n = 10, e così via, come in una
+raccolta che cresce. Non si stratifica per classe: un centro nuovo dà i casi che arrivano.
+
+**Vetrini di valutazione** (per centro ed estrazione, fissi al variare di n): tutti i vetrini di *c* dei
+pazienti **non** inclusi con n = 40. Così ogni n e ogni riferimento si confrontano sugli stessi vetrini.
+Con CWZ (93 vetrini, 20 pazienti) restano circa 50 vetrini, di cui circa 20 positivi.
+
+**Modello.** Come E6: ABMIL con gli iperparametri di `conf/config.yaml`, ricetta vuota, `pos_weight`
+globale, un thread, semi di training {0, 1, 2}. Training: i vetrini di sviluppo degli altri tre centri
++ gli n vetrini aggiunti di *c*. Nessun peso in più per il centro nuovo (vedi *Limiti*). Per ogni
+centro, n ed estrazione, tre semi: 4 × 4 × 3 × 3 = **144 modelli**.
+
+**Riferimenti** (sugli stessi vetrini di valutazione, dalla riesecuzione di E6 di E10,
+`data/reports/experiments/e10/e6/predictions.csv`):
+
+- **n = 0**: logit LOCO di E6 (centro mai visto);
+- **centro visto**: logit fuori fold della CV di E6 (il centro contribuisce circa l'80% dei suoi vetrini
+  al training);
+- **offset**: la correzione di E9, variante `solo in discesa`, con i **negativi tra gli n vetrini
+  aggiunti** come k, applicata alle logit LOCO di E6 (non si stima se l'estrazione non ha negativi). È
+  l'alternativa senza riaddestramento con gli stessi vetrini.
+
+**Esiti** (soglia 0,5 sulla logit, che non dipende dalla temperatura; per centro, per n; media sui tre
+semi e sulle tre estrazioni, e i 9 valori nel report).
+
+- Primari: specificità, sensibilità, sensibilità sulle micrometastasi, sul centro *c*.
+- Secondari:
+  - mediana delle logit dei negativi e dei positivi di *c* (la misura di E6), accanto a quelle in CV;
+  - AUROC sul centro;
+  - ECE calibrata con la temperatura della rotazione di E6 (gruppo `loco-calibration`): una stima, perché
+    la temperatura non è ristimata con i vetrini aggiunti;
+  - frazione di distanza chiusa: (specificità_n − specificità_0) / (specificità_visto − specificità_0),
+    per i centri dove la distanza è almeno 0,05;
+  - sensibilità sulle macrometastasi e specificità per dominio (Radboud e Utrecht: CAMELYON16 e 17).
+
+**Criterio** (fissato ora). Per ogni centro, n è **sufficiente** se, in media su semi ed estrazioni, sui
+vetrini di valutazione:
+
+1. la specificità non è sotto quella del centro visto di più di **0,05**;
+2. la sensibilità non è sotto quella del centro visto di più di **0,05** (il vincolo di E9);
+3. la sensibilità sulle micrometastasi non è sotto quella del centro visto di più di **0,10** (margine più
+   largo: circa 5–15 micrometastasi di valutazione per centro);
+4. nessuno dei 9 modelli (semi × estrazioni) ha specificità sotto **0,80**, la soglia del gate:
+   un'installazione vera fa una sola raccolta e un solo training.
+
+Il **costo d'ingresso** di un centro è il più piccolo n sufficiente (0 se lo è già E6 LOCO). La risposta di
+E14 è il costo d'ingresso dei centri dove E6 fallisce (Utrecht, CWZ); se per un centro nessun n ≤ 40 è
+sufficiente, si riporta "oltre 40" e la frazione di distanza chiusa a n = 40.
+
+Riaddestrare **rende più dell'offset** a un dato n se rispetta le condizioni 1–3 e l'offset con gli stessi
+vetrini no, oppure se le rispettano entrambi e il riaddestramento ha sensibilità sulle micrometastasi più
+alta di almeno 0,05.
+
+**Lettura** (fissata ora).
+
+- Costo d'ingresso ≤ 20 vetrini su Utrecht e CWZ: l'ingresso di un centro con l'uso silente è
+  praticabile (pochi giorni o settimane di casi); il percorso si progetta per la decisione con i patologi,
+  e la normalizzazione del colore (E13) e H-optimus-0 diventano modi di ridurre quel costo, non
+  precondizioni.
+- Costo d'ingresso 40: praticabile ma lento; E13 torna prioritario.
+- Oltre 40, ma con la distanza che si chiude al crescere di n: il centro va visto con più vetrini o
+  pesato di più; serve un protocollo con il peso del centro nuovo come variabile.
+- Distanza che non si chiude: vedere il centro in training non basta con pochi vetrini; la leva torna a
+  monte (E13, H-optimus-0).
+- Perché E14 prima di E13: dice se il problema si risolve con i dati che la pipeline raccoglierà comunque,
+  senza riscaricare circa 2 TB; e il suo esito decide quanto conta E13.
+
+**Limiti.**
+
+- I vetrini aggiunti vengono dallo stesso insieme storico dei vetrini di valutazione: in esercizio arrivano
+  dopo, con una preparazione che può essere cambiata (E3b: i casi di Radboud del 2015 sono un dominio a
+  parte). A Radboud e Utrecht le estrazioni mescolano CAMELYON16 e 17; la specificità per dominio lo
+  mostra in parte.
+- La prevalenza di CAMELYON17 è arricchita (pazienti scelti per stadio pN): un centro clinico dà meno
+  positivi, quindi i positivi aggiunti qui sono più del reale per lo stesso n.
+- Nessun peso per il centro nuovo: con 5 vetrini su circa 600 il training può ignorarli. È la situazione
+  di una pipeline semplice; un peso è una variabile per un protocollo successivo, se la curva lo chiede.
+- Temperatura non ristimata: l'ECE è indicativa; le decisioni usano la soglia 0,5, che non ne dipende.
+- Tre estrazioni e tre semi: la variabilità tra semi di E6 su Utrecht è grande (specificità da 0,09 a
+  0,82); la condizione 4 la controlla, ma 9 modelli sono pochi per un quantile.
+- Quattro centri, di cui uno solo con uno scanner diverso (Utrecht, Hamamatsu): il costo d'ingresso di
+  uno scanner nuovo si misura in sostanza su un centro. Un backbone.
+
+**Costo.** 144 modelli. In E12 la riesecuzione di E6 (22 modelli per seme, tre semi in parallelo) ha
+richiesto circa 5 ore e mezza, circa 15 minuti per modello per processo; con tre processi in parallelo
+E14 richiede circa 12 ore. Lo script deve poter riprendere da dove si è fermato (un file di logit per
+modello).
+
+**Codice.** `experiments/e14_new_centre.py` (estrazioni, training con il codice del protocollo della
+testa, logit dei vetrini di valutazione, analisi) e `experiments/e14_run.sh`; provato su dati sintetici e
+committato prima dell'esecuzione sui dati reali.
