@@ -23,7 +23,6 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
-| E15b | V contro T: stabilità su tutte le assegnazioni dei ruoli e sui semi delle tile, differenze appaiate con bootstrap per paziente, errori della testa intercettati | protocollo fissato | se la scelta di V regge o se T va preferito per non perdere micrometastasi; implementazione in `predict` sospesa fino all'esito |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2076,8 +2075,7 @@ Secondari:
    assente dal riferimento. È la regola del protocollo (tutto lo sviluppo meno un fold per paziente). Al passo
    «ingresso di un centro nuovo», i vetrini del centro entrano nel riferimento con la stessa versione. Non è
    misurato quanti ne servano perché il punteggio smetta di rinviare quel centro: è la domanda gemella di E14,
-   a costo quasi nullo, e la propongo come E15b. *(Annotazione del 22/10/2026: rinominata E15c; il nome E15b è andato al confronto
-   V contro T chiesto dopo questi risultati.)*
+   a costo quasi nullo, e la propongo come E15b.
 4. **Cosa paga V rispetto a T:**
    - il falso negativo di Rijnstate non rinviato;
    - più falsi rinvii sui micro (0,108 contro 0,065).
@@ -2098,102 +2096,3 @@ embedding» con V:
 - riferimento e soglia salvati come artefatto della versione della testa.
 
 Da implementare.
-
-## E15b — V contro T: la scelta regge?
-
-Protocollo fissato il 22/10/2026, dopo i risultati di E15 e prima di ogni calcolo di questo esperimento.
-
-**Perché.** In E15 passano entrambi i candidati e la regola fissata sceglie V. Sui numeri, però, T rinvia meno
-micrometastasi in distribuzione (0,065 contro 0,108) e intercetta l'unico falso negativo di E6 che V lascia
-passare. V rinvia meno macrometastasi (0,013 contro 0,093) e meno positivi in totale (0,065 contro 0,077), e
-rileva meglio Rijnstate escluso (0,891 contro 0,804). Le differenze sono di pochi vetrini (10 contro 6 micro) e
-vengono da una sola assegnazione dei ruoli e da un solo campione di tile.
-
-**Domanda.** Le differenze tra V e T sono stabili, o rumore dell'assegnazione e del campione? In particolare T
-intercetta più errori della testa, e rinvia meno micrometastasi, in modo che regga?
-
-**Che cosa non è.** Non è una conferma indipendente: i vetrini sono gli stessi 771 di E15, e LPON resta chiuso.
-Misura se la scelta di E15 dipende dal caso. Per questo il protocollo fissa ora metriche, regola e margini, e V
-resta la scelta se il confronto non è netto. L'implementazione del rinvio in `predict` attende l'esito.
-
-**Dati.** Come E15: cohort `ln_metastasis` v1, 771 vetrini di sviluppo, Phikon `057cc0295895`, tile normalizzate
-L2, riassunti della cache di E15 (`summaries.npz`, per i campioni di tile nuovi si rilegge dallo store). Predizioni
-di E6 dalla riesecuzione di E10.
-
-**Candidati** (gli stessi di E15, nessuno nuovo):
-
-- **V:** media del vetrino, 5 vicini.
-- **T:** 200 tile, distanza dal più vicino dei 256 prototipi k-center per vetrino di riferimento.
-
-Sensibilità, riportata ma non decisiva:
-- V con 3 e 10 vicini;
-- T con 500 tile (come E3).
-
-**Assegnazioni dei ruoli.** Per ogni rotazione di E15 (4 centri e i 2 domini CAMELYON16), tutte le 20 scelte di
-(fold di calibrazione, fold di valutazione) tra i 5 fold del cohort; il riferimento sono gli altri tre fold. Ogni
-vetrino di un centro di training è valutato in distribuzione in 4 assegnazioni per rotazione, contro le 1 di E15.
-Per T, 5 semi del campione di tile e dei prototipi (0–4) per ogni assegnazione; per V il calcolo è deterministico.
-La soglia, conformal con α 0,05, è ricalcolata in ogni assegnazione e per ogni seme.
-
-**Unità di misura.** Per ogni vetrino e candidato, la **probabilità di rinvio**: quota delle assegnazioni (e dei
-semi) in cui viene rinviato, separatamente in distribuzione (rotazioni dei 4 centri in cui il suo centro è nel
-training) e fuori distribuzione (la rotazione del suo centro). Le metriche sono medie di queste probabilità.
-
-**Esiti primari** (per candidato e come differenza appaiata T − V):
-
-1. **Errori della testa intercettati**, cioè i falsi negativi di E6 rinviati, su due gruppi di vetrini:
-   - quelli di CV fuori fold, in distribuzione: logit < 0 e positivo, 12 vetrini distinti sui tre semi;
-   - quelli sul centro escluso, fuori distribuzione: 7 vetrini distinti.
-
-   Unità: il vetrino × seme della testa, come in E15.
-2. **Micrometastasi rinviate in distribuzione** (93 vetrini).
-3. **Positivi rinviati in distribuzione** (168).
-4. **Falsi rinvii in distribuzione**, su tutti i vetrini (criterio 1 di E15).
-5. **Rilevamento del centro escluso**, nella rotazione peggiore (oggi Rijnstate).
-
-**Incertezza.** Bootstrap per paziente, 2000 ricampionamenti, seme 0, appaiato: le stesse estrazioni per V e T.
-Intervallo al 95% percentile della differenza T − V per ogni esito.
-
-**Regola** (fissata ora; V è la scelta di partenza).
-
-- **T sostituisce V** se valgono tutte e tre:
-  1. T intercetta più errori della testa: la differenza sull'esito 1, sui due gruppi insieme, ha intervallo
-     tutto sopra 0;
-  2. T non costa troppo: limite superiore dell'intervallo ≤ +0,02 sui falsi rinvii (esito 4) e ≤ +0,03 sui
-     positivi rinviati (esito 3);
-  3. T non perde il centro nuovo: limite inferiore dell'intervallo ≥ −0,05 sul rilevamento della rotazione
-     peggiore (esito 5).
-- **V resta** in ogni altro caso, anche se T è migliore sulle micrometastasi (esito 2) senza vincere
-  sull'esito 1. Le micro rinviate sono lavoro in più per il patologo, non errori; la decisione si prende sugli
-  errori della testa.
-- **Stabilità del criterio di E15:**
-  - per ogni candidato si riporta la quota di assegnazioni (× semi) in cui passa tutti e quattro i criteri
-    primari di E15;
-  - se il candidato scelto dalla regola li passa in meno dell'**80%** delle assegnazioni, non è adottabile
-    così: in quel caso si riporta e `predict` resta con il solo controllo sui metadati fino a un protocollo
-    nuovo.
-
-**Lettura** (fissata ora).
-
-- Con 19 vetrini distinti tra gli errori della testa, l'esito 1 potrà distinguere i candidati solo se la
-  differenza è grande: con un intervallo che comprende 0 la conclusione è «non distinguibili», non «uguali».
-- Il vetrino `patient_073_node_3` (punteggio V 0,387 contro soglia 0,392 in E15) si riporta a parte, con la sua
-  probabilità di rinvio per candidato. È il caso che ha motivato l'esperimento, quindi non può deciderlo da solo.
-
-**Secondari.**
-
-- Le stesse metriche per rotazione e per dominio.
-- Le macrometastasi rinviate.
-- I falsi positivi di E6 rinviati, criterio 3 di E15.
-- I domini CAMELYON16 e i casi di Radboud del 2015.
-- La sensibilità a k per V e al numero di tile per T.
-- La variabilità della soglia tra le assegnazioni.
-
-**Costo.**
-- V: secondi.
-- T: 6 rotazioni × 20 assegnazioni × 5 semi = 600 ricerche esatte su circa 100.000 prototipi, più i k-center.
-  I prototipi di un vetrino di riferimento dipendono solo dal seme, non dall'assegnazione: si calcolano una volta
-  per seme e si riusano. Stima: 1–2 ore con quattro thread, accanto a E14.
-
-**Codice.** `experiments/e15b_stability.py`, che riusa le funzioni di `e15_domain.py`; provato su dati sintetici e
-committato prima dell'esecuzione.
