@@ -119,6 +119,15 @@ def head_errors(scores: pd.DataFrame, rerun: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
+def missed_referred(scores: pd.DataFrame, rerun: pd.DataFrame) -> dict:
+    """{(rotation, candidate): share of E6's held-out false negatives the score refers, over the seeds}."""
+    out = scores[(scores.role == "fuori distribuzione") & ~scores.rotation.str.endswith("camelyon16")]
+    loco = rerun[(rerun.group == "loco") & (rerun.logit < 0) & (rerun.y == 1)]
+    g = loco.merge(out[["slide_id", "rotation", *[f"refer_{c}" for c in CANDIDATES]]],
+                   left_on=["slide_id", "evaluation"], right_on=["slide_id", "rotation"], validate="many_to_one")
+    return {(rot, c): r[f"refer_{c}"].mean() for rot, r in g.groupby("rotation") for c in CANDIDATES}
+
+
 def judge(m: dict) -> list[str]:
     fails = []
     if m["false"] > MAX_FALSE:
@@ -151,6 +160,7 @@ def main():
     E15.mkdir(parents=True, exist_ok=True)
     scores.drop(columns=["exhaustive_annot"]).to_csv(E15 / "scores.csv", index=False)
     errors = head_errors(scores, pd.read_csv(RERUN))
+    missed = missed_referred(scores, pd.read_csv(RERUN))
     main_rot = ~scores.rotation.str.endswith("camelyon16")
     ind = scores[main_rot & (scores.role == "in distribuzione")]
     out = scores[main_rot & (scores.role == "fuori distribuzione")]
@@ -180,7 +190,7 @@ def main():
     for rot, g in scores.groupby("rotation", sort=False):
         gi, go = g[g.role == "in distribuzione"], g[g.role == "fuori distribuzione"]
         for c in CANDIDATES:
-            fn = errors[errors.candidate == c].fn_referred.mean() if not rot.endswith("camelyon16") else math.nan
+            fn = missed.get((rot, c), math.nan)
             micro = go[go.reference_diagnosis == "micro"][f"refer_{c}"].mean()
             macro = go[go.reference_diagnosis == "macro"][f"refer_{c}"].mean()
             lines.append(f"| {rot} | {c} | {fmt(gi[f'refer_{c}'].mean())} | {fmt(go[f'refer_{c}'].mean())} | "
