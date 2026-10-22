@@ -2095,4 +2095,9 @@ embedding» con V:
 - soglia conformal α 0,05;
 - riferimento e soglia salvati come artefatto della versione della testa.
 
-Da implementare.
+*(Annotazione del 22/10/2026: implementato.*
+- *Il codice è in `heads/domain.py`; la configurazione è `head.domain_check` (k 5, α 0,05, fold di calibrazione 3, come E15).*
+- *`train_head` scrive `domain.json` e `domain.npz`, con i tag `domain_k` e `domain_threshold` sulla versione.*
+- *`predict` ed `external` aggiungono il motivo di rinvio; si disattiva con `predict.domain_check=false`.*
+- *Sui riassunti di E15, la rotazione «CWZ escluso» ridà la stessa soglia (0,39208).*
+- *Le versioni registrate prima di questa modifica vengono rifiutate («train it again»), come quelle senza insiemi conformal.)*

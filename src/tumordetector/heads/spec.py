@@ -2,7 +2,8 @@
 and which slides are held out. One YAML file per head in conf/head/, checked here before any data is read.
 
 Also part of a head: its training recipe (mitigations against the centre effect, experiment E7), how
-its scores are calibrated and the battery it must pass.
+its scores are calibrated, how it recognises a domain its development does not cover (E15) and the
+battery it must pass.
 """
 from typing import Literal
 
@@ -25,6 +26,18 @@ class Conformal(BaseModel):
 
     method: Literal["per_class"] = "per_class"
     alpha: float = Field(default=0.05, gt=0, lt=0.5)
+
+
+class DomainCheck(BaseModel):
+    """Referral of slides from a domain the development does not cover (experiment E15, candidate V): mean
+    distance of the slide's mean unit tile from its k nearest development slides; conformal threshold with
+    `alpha` from the cohort fold `calibration_fold`, which is left out of the reference."""
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["slide_mean_knn"] = "slide_mean_knn"
+    k: int = Field(default=5, ge=1)
+    alpha: float = Field(default=0.05, gt=0, lt=0.5)
+    calibration_fold: int = Field(default=3, ge=0)
 
 
 class Gate(BaseModel):
@@ -64,6 +77,7 @@ class HeadSpec(BaseModel):
     # ^ mitigations, heads/mitigations.py; empty = the training of E6
     calibration: Calibration = Calibration()
     conformal: Conformal = Conformal()
+    domain_check: DomainCheck = DomainCheck()
     gate: Gate
     overwrite: bool = False
 

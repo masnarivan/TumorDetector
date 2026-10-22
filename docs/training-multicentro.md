@@ -390,6 +390,7 @@ src/tumordetector/
   (22/10/2026) heads/conformal.py   insiemi per classe (E10)
   (22/10/2026) serve/answer.py      positivo / negativo / rinvio con i motivi; serve/registry.py: versione dal registry
   (22/10/2026) tasks/predict.py     td task=predict head=<id> predict.slides=[...]
+  (22/10/2026) heads/domain.py      controllo del dominio (E15, V): riferimento e soglia salvati con la versione
 conf/
   head/ln_metastasis.yaml
   mitigation/{balanced,group_dro,stat_mix}.yaml

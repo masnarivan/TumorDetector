@@ -67,6 +67,7 @@ predict:             # td task=predict: the answer of a registered head for embe
   slides: []         # slide ids of the head's datasets; the locked external test is refused
   alias: validated   # validated | candidate: a version not validated always refers
   seen_only: true    # refer slides of a centre or scanner the version has not seen (proposed 22/10/2026)
+  domain_check: true # refer slides far from the development in the embeddings (E15, V)
   top_tiles: 10      # tiles with most attention in the answer
   out: null          # null = data/reports/<backbone>/predictions/<head>
 

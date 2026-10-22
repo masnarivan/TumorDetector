@@ -1,6 +1,6 @@
 """`td task=predict head=<id> predict.slides=[...]`: the answer of a registered head for slides already
-embedded (contract M4). One JSON per slide: calibrated probability, conformal set, decision with every
-reason for a referral, and the tiles with most attention.
+embedded (contract M4). One JSON per slide: calibrated probability, conformal set, domain check (E15),
+decision with every reason for a referral, and the tiles with most attention.
 
 Slides of the locked external test are refused: it is read only by its own task, once per version.
 """
@@ -63,8 +63,10 @@ def run(cfg: DictConfig):
     for r in rows.itertuples():
         slide = store.read_slide(roots[r.dataset], r.slide_id)
         logit, prob, att = head.score(slide.features)
+        dist = head.domain_score(slide.features)
         a = answer(prob, head.q0, head.q1, head.validated, r.center in head.centers if p.seen_only else None,
-                   r.scanner in head.scanners if p.seen_only else None)
+                   r.scanner in head.scanners if p.seen_only else None,
+                   dist <= head.domain_threshold if p.domain_check else None)
         top = np.argsort(-att)[:p.top_tiles]
         result = {
             "slide_id": r.slide_id, "dataset": r.dataset, "center": r.center, "scanner": r.scanner,
@@ -72,8 +74,10 @@ def run(cfg: DictConfig):
             "alias": p.alias, "validated": head.validated, "collection": ident["collection"], "code_version": code,
             "logit": logit, "temperature": head.temperature, "probability": prob,
             "conformal": {"alpha": head.alpha, "q0": head.q0, "q1": head.q1},
+            "domain": {"distance": dist, "threshold": head.domain_threshold, "k": head.domain_k},
             **a,
             "in_development": r.slide_id in dev,   # a training slide of this version: not an independent answer
+                                                   # (and its own mean is in the domain reference)
             "top_tiles": [{"tile": int(i), "x": int(slide.tiles.x.iloc[i]), "y": int(slide.tiles.y.iloc[i]),
                            "attention": float(att[i])} for i in top],
         }

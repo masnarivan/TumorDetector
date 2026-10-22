@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
+from tumordetector.heads import domain
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
 from tumordetector.heads.conformal import at_prevalence, class_quantiles, coverage, prediction_set, quantile
 from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
@@ -263,7 +264,7 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     monkeypatch.chdir(tmp_path)
     uri = f"sqlite:///{tmp_path / 'mlflow.db'}"
     head = ["head.datasets=[d1,d2]", "head.roles.external.center=[z]", "head.calibration.inner_folds=2",
-            f"paths.heads={tmp_path / 'heads'}"]
+            "head.domain_check.calibration_fold=2", f"paths.heads={tmp_path / 'heads'}"]
     cli.main(["task=cohort", *head, "mil.folds=3"])
     cli.main(["task=train_head", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}", f"mlflow.tracking_uri={uri}",
               "mil.epochs=6", "mil.hidden=32", "mil.lr=0.002", "mil.seeds=[0]", "mil.workers=1"])
@@ -282,6 +283,10 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert version.tags["head_version"] == "1" and float(version.tags["temperature"]) > 0
     assert version.tags["centers"] == "a,b,c,d" and version.tags["scanners"] == "s"   # never the external centre
     assert float(version.tags["conformal_q1"]) == conformal["q1"]
+    dom = read_json(rep / "domain.json")
+    assert dom["k"] == 5 and dom["n_reference"] + dom["n_calibration"] == 39 and dom["threshold"] > 0
+    assert float(version.tags["domain_threshold"]) == dom["threshold"]
+    assert len(np.load(rep / "domain.npz")["reference"]) == dom["n_reference"]
 
     # td task=predict: the candidate answers, but always refers; the locked external test is refused
     monkeypatch.setattr("tumordetector.tasks.predict.dataset_cfg", cfgs.__getitem__)
@@ -295,6 +300,7 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     a = read_json(answers / "a01.json")
     assert a["decision"] == "rinvio" and a["reasons"][0].startswith("versione non validata") and a["in_development"]
     assert 0 < a["probability"] < 1 and len(a["top_tiles"]) == 10 and a["conformal"]["q1"] == conformal["q1"]
+    assert a["domain"]["threshold"] == dom["threshold"] and a["domain"]["distance"] >= 0
     monkeypatch.setattr("tumordetector.tasks.external.dataset_cfg", cfgs.__getitem__)
     ext = ["task=external", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}", f"mlflow.tracking_uri={uri}",
            f"external.log={tmp_path / 'external_log.csv'}"]
@@ -318,6 +324,7 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert sorted(s for s in loaded if s.startswith("z")) == [f"z{i:02d}" for i in range(10)]
     log = pd.read_csv(tmp_path / "external_log.csv")
     assert log.status.tolist() == ["conclusa"] and log.referral_unseen.iloc[0] == 1.0   # centre z never seen
+    assert 0 <= log.referral_domain.iloc[0] <= 1
     report = (tmp_path / f"out/reports/dummy/external/ln_metastasis/v{version.version}/report.md").read_text()
     assert "Giorno zero" in report and "scanner s" in report
     with pytest.raises(SystemExit, match="once per version"):
@@ -375,6 +382,29 @@ def test_the_answer_refers_with_every_reason():
     assert unsure["set"] == [0, 1] and unsure["reasons"][0].startswith("incerto")
     many = answer(0.95, **sure, validated=False, center_seen=False, scanner_seen=False)
     assert many["decision"] == "rinvio" and len(many["reasons"]) == 3 and many["set"] == [1]
+    far = answer(0.95, **sure, validated=True, center_seen=True, scanner_seen=True, domain_seen=False)
+    assert far["decision"] == "rinvio" and far["reasons"] == [
+        "dominio non riconosciuto dagli embedding: il vetrino è lontano da quelli di sviluppo"]
+
+
+def test_the_domain_check_refers_a_shifted_centre_and_few_development_slides():
+    rng = np.random.default_rng(0)
+    centre = rng.normal(size=(1, 32))
+    bags = [centre + 0.3 * rng.normal(size=(50, 32)) for _ in range(100)]
+    means = np.stack([domain.slide_mean(b) for b in bags])
+    assert np.allclose(np.linalg.norm(means, axis=1), np.linalg.norm(means, axis=1).mean(), atol=0.05)
+    assert np.allclose(domain.slide_mean(bags[0]), (bags[0] / np.linalg.norm(bags[0], axis=1)[:, None]).mean(0),
+                       atol=1e-6)
+    folds = np.arange(100) % 5
+    fitted = domain.fit(means, folds, calibration_fold=3, k=5, alpha=0.05)
+    assert fitted["n_reference"] == 80 and fitted["n_calibration"] == 20 and len(fitted["reference"]) == 80
+    new = [centre + 0.3 * rng.normal(size=(50, 32)) for _ in range(200)]
+    shifted = [centre + rng.normal(size=(1, 32)) + 0.3 * rng.normal(size=(50, 32)) for _ in range(50)]
+    s_new = domain.score(np.stack([domain.slide_mean(b) for b in new]), fitted["reference"], 5)
+    s_shift = domain.score(np.stack([domain.slide_mean(b) for b in shifted]), fitted["reference"], 5)
+    assert (s_new > fitted["threshold"]).mean() < 0.15 and (s_shift > fitted["threshold"]).mean() > 0.9
+    with pytest.raises(ValueError, match="calibration fold 7"):
+        domain.fit(means, folds, calibration_fold=7, k=5, alpha=0.05)
 
 
 # --- mitigations (experiment E7) -------------------------------------------------------------------

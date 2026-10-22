@@ -23,6 +23,11 @@ calibration:
 conformal:                         # prediction sets per class (E10): {0}, {1} answer; {0,1}, {} refer
   method: per_class
   alpha: 0.05
+domain_check:                      # refer slides from a domain the development does not cover (E15, V)
+  method: slide_mean_knn           # distance of the slide's mean unit tile from its k nearest dev slides
+  k: 5
+  alpha: 0.05                      # conformal threshold from the calibration fold's scores
+  calibration_fold: 3              # left out of the reference, as in E15
 gate:                              # initial proposals, to be agreed with the pathologists
   min_slides: 100                  # below this a run only checks that the code works
   min_cv_auroc: 0.90

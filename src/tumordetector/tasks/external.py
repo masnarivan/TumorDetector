@@ -5,8 +5,8 @@ Only a version holding the 'validated' alias, and only once: every consultation 
 stops halfway still counts. A second consultation of the same version is refused.
 
 Three measures (docs/training-multicentro.md): whether the external slides are referred as an unseen
-centre or scanner (the first step of a new centre's entry), the answers the version would give if it
-answered anyway (day zero: discrimination, calibration, conformal coverage), per scanner.
+centre or scanner (the first step of a new centre's entry) and by the domain check (E15), the answers the
+version would give if it answered anyway (day zero: discrimination, calibration, conformal coverage), per scanner.
 """
 import datetime
 from pathlib import Path
@@ -18,7 +18,8 @@ from tumordetector.config import dataset_cfg
 from tumordetector.io import code_version, write_json
 
 LOG_COLUMNS = ["date", "head", "head_version", "model", "model_version", "collection", "code_version", "status",
-               "n_slides", "auroc", "sensitivity", "specificity", "ece", "positive_coverage", "referral_unseen"]
+               "n_slides", "auroc", "sensitivity", "specificity", "ece", "positive_coverage", "referral_unseen",
+               "referral_domain"]
 
 
 def _fmt(x) -> str:
@@ -75,19 +76,23 @@ def run(cfg: DictConfig):
 
     preds = []
     for r in ext.itertuples():
-        logit, p, _ = head.score(store.read_slide(roots[r.dataset], r.slide_id).features)
-        seen = answer(p, head.q0, head.q1, head.validated, r.center in head.centers, r.scanner in head.scanners)
+        features = store.read_slide(roots[r.dataset], r.slide_id).features
+        logit, p, _ = head.score(features)
+        dist = head.domain_score(features)
+        seen = answer(p, head.q0, head.q1, head.validated, r.center in head.centers, r.scanner in head.scanners,
+                      dist <= head.domain_threshold)
         day0 = answer(p, head.q0, head.q1, head.validated, None, None)
         preds.append({"slide_id": r.slide_id, "center": r.center, "scanner": r.scanner, "y": r.label,
                       "reference_diagnosis": r.reference_diagnosis, "logit": logit, "p": p,
                       "decision": seen["decision"], "unseen": any("non visto" in x for x in seen["reasons"]),
+                      "domain_distance": dist, "domain_referred": dist > head.domain_threshold,
                       "set": "".join(map(str, day0["set"])) or "vuoto", "decision_day0": day0["decision"]})
     preds = pd.DataFrame(preds)
 
     def measure(g: pd.DataFrame) -> dict:
         m = binary_metrics(g.y, g.p)
         c = coverage(g.p, g.y, head.q0, head.q1)
-        return {**m, **c, "referral_unseen": float(g.unseen.mean())}
+        return {**m, **c, "referral_unseen": float(g.unseen.mean()), "referral_domain": float(g.domain_referred.mean())}
 
     overall = measure(preds)
     by_scanner = {s: measure(g) for s, g in preds.groupby("scanner")}
@@ -97,13 +102,15 @@ def run(cfg: DictConfig):
     write_json(rep / "metrics.json", {"overall": overall, "by_scanner": by_scanner, "model": model_name,
                                       "model_version": head.version, "code_version": code})
     cols = ["n", "n_pos", "auroc", "sensitivity", "specificity", "ece", "positive_coverage", "negative_coverage",
-            "referral", "referral_unseen"]
+            "referral", "referral_unseen", "referral_domain"]
     lines = [f"# Test esterno — {model_name} v{head.version}", "",
              f"Consultazione del {row['date']}, l'unica per questa versione (registro: `{log_path}`). "
              f"Codice `{code}`, collezione `{ident['collection']}`, testa {spec.id} v{spec.version}.", "",
              f"- **Rinvio come centro o scanner non visto**: {_fmt(overall['referral_unseen'])} dei vetrini "
              f"(centri della versione: {', '.join(sorted(head.centers))}; "
              f"scanner: {', '.join(sorted(head.scanners))}).",
+             f"- **Rinvio dal controllo del dominio** (E15, distanza dai {head.domain_k} vetrini di sviluppo più "
+             f"vicini, soglia {head.domain_threshold:.4f}): {_fmt(overall['referral_domain'])} dei vetrini.",
              "- **Giorno zero** (se la versione rispondesse comunque): soglia 0,5 sulla probabilità calibrata "
              f"(temperatura {head.temperature:.3f}); insiemi conformal per classe, alpha {head.alpha}.", "",
              "| Gruppo | " + " | ".join(cols) + " |", "|" + "---|" * (len(cols) + 1),
@@ -113,9 +120,9 @@ def run(cfg: DictConfig):
     (rep / "report.md").write_text("\n".join(lines) + "\n")
 
     log.loc[log.index[-1], ["status", "auroc", "sensitivity", "specificity", "ece", "positive_coverage",
-                            "referral_unseen"]] = ["conclusa", overall["auroc"], overall["sensitivity"],
-                                                   overall["specificity"], overall["ece"],
-                                                   overall["positive_coverage"], overall["referral_unseen"]]
+                            "referral_unseen", "referral_domain"]] = [
+        "conclusa", overall["auroc"], overall["sensitivity"], overall["specificity"], overall["ece"],
+        overall["positive_coverage"], overall["referral_unseen"], overall["referral_domain"]]
     log.to_csv(log_path, index=False)
     print(f"{model_name} v{head.version} on the external test: AUROC {_fmt(overall['auroc'])}, "
           f"referred as unseen {_fmt(overall['referral_unseen'])}")

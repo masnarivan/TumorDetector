@@ -38,7 +38,7 @@ def run(cfg: DictConfig):
     from mlflow.types import Schema, TensorSpec
 
     from tumordetector.embed import store
-    from tumordetector.heads import report
+    from tumordetector.heads import domain, report
     from tumordetector.heads.cohort import check_unchanged, cohort_path, embedding_roots
     from tumordetector.heads.protocol import head_gate
     from tumordetector.heads.spec import HeadSpec
@@ -97,6 +97,9 @@ def run(cfg: DictConfig):
                "Ricetta": ", ".join(spec.recipe) or "nessuna mitigazione",
                "Calibrazione": f"{spec.calibration.method}, {spec.calibration.inner_folds} fold interni nel LOCO",
                "Insiemi conformal": f"{spec.conformal.method}, alpha {spec.conformal.alpha}",
+               "Controllo del dominio": f"{spec.domain_check.method}, k {spec.domain_check.k}, alpha "
+                                        f"{spec.domain_check.alpha}, fold di calibrazione "
+                                        f"{spec.domain_check.calibration_fold}",
                "Semi": f"{seeds} (modello e temperatura salvati: seme {seeds[0]})", "Versione codice": code}
 
     rep = (Path(cfg.mil.report_dir) if cfg.mil.report_dir
@@ -115,6 +118,17 @@ def run(cfg: DictConfig):
                  "seed": seeds[0], "fitted_on": "out-of-fold calibrated probabilities of the cross-validation",
                  "cohort_sha256": cohort_sha}
     write_json(rep / "conformal.json", conformal)
+    # The domain check (E15): its reference and threshold go with the version, like the temperature.
+    dc = spec.domain_check
+    means = np.stack([domain.slide_mean(np.load(roots[r.dataset] / f"{r.slide_id}.npy", mmap_mode="r"))
+                      for r in table.itertuples()])
+    fitted = domain.fit(means, table.cv_fold.to_numpy(), dc.calibration_fold, dc.k, dc.alpha)
+    ref_ids = table.slide_id[table.cv_fold.to_numpy() != dc.calibration_fold].to_numpy()
+    np.savez(rep / "domain.npz", reference=fitted["reference"], slide_id=ref_ids.astype(str))
+    domain_info = {"method": dc.method, "k": dc.k, "alpha": dc.alpha, "calibration_fold": dc.calibration_fold,
+                   "threshold": fitted["threshold"], "n_reference": fitted["n_reference"],
+                   "n_calibration": fitted["n_calibration"], "cohort_sha256": cohort_sha}
+    write_json(rep / "domain.json", domain_info)
     # What this version has seen: the inference task refers slides of any other centre or scanner.
     seen = {"centers": ",".join(sorted(table.center.unique())), "scanners": ",".join(sorted(table.scanner.unique()))}
     result["predictions"].to_csv(rep / "predictions.csv", index=False)
@@ -157,7 +171,8 @@ def run(cfg: DictConfig):
                     "recipe": ",".join(spec.recipe) or "none",
                     "center_probe_auroc": metrics.get("robustness", {}).get("center_probe_auroc"),
                     "temperature": calibration["temperature"], "conformal_alpha": conformal["alpha"],
-                    "conformal_q0": conformal.get("q0"), "conformal_q1": conformal.get("q1"), **seen}
+                    "conformal_q0": conformal.get("q0"), "conformal_q1": conformal.get("q1"),
+                    "domain_k": dc.k, "domain_threshold": domain_info["threshold"], **seen}
             for k, v in tags.items():
                 client.set_model_version_tag(model_name, version, k, str(v))
     print(f"{model_name}: {result['n_dev']} development slides, battery {verdict['status']}",
