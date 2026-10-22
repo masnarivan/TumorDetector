@@ -20,7 +20,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
-from tumordetector.heads.conformal import class_quantiles, coverage
+from tumordetector.heads.conformal import answer_rates, class_quantiles, coverage
 from tumordetector.heads.mitigations import fit_recipe
 from tumordetector.mil.abmil import ABMIL, fit, predict_logits, top_instance_logits
 from tumordetector.mil.evaluate import attention_auroc, binary_metrics
@@ -209,8 +209,9 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             record(inner_ids, inner_logits, temperatures[f"held-out {c}"], f"held-out {c}", "loco-calibration")
             q = class_quantiles(sigmoid(inner_logits / temperatures[f"held-out {c}"]),
                                 t.label[inner_ids].to_numpy(), alpha)
-            conformal[f"held-out {c}"] = {**q, **coverage(sigmoid(logits / temperatures[f"held-out {c}"]),
-                                                          t.label[test_ids].to_numpy(), q["q0"], q["q1"])}
+            p_test, y_test = sigmoid(logits / temperatures[f"held-out {c}"]), t.label[test_ids].to_numpy()
+            conformal[f"held-out {c}"] = {**q, **coverage(p_test, y_test, q["q0"], q["q1"]),
+                                          **answer_rates(p_test, y_test, q["q0"], q["q1"])}
 
     final = None
     if table.label.nunique() == 2:
@@ -228,6 +229,27 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
     cv, loco = preds[preds.group == "cv"], preds[preds.group == "loco"]
     loco_cal = {k: metrics(g) for k, g in loco.groupby("evaluation")}
     loco_raw = {k: metrics(g, "p_raw") for k, g in loco.groupby("evaluation")}
+
+    def by_diagnosis(g: pd.DataFrame, q: dict | None) -> dict:
+        """Positives per reference diagnosis (e.g. micro / macro metastases): sensitivity at the threshold
+        and, with the sets, the share answered positive, referred and missed (answered negative)."""
+        out = {}
+        for d, gd in g[g.y == 1].groupby("reference_diagnosis"):
+            m = {"n": int(len(gd)), "sensitivity": float((gd.p >= cfg.threshold).mean())}
+            if q:
+                r = answer_rates(gd.p.to_numpy(), gd.y.to_numpy(), q["q0"], q["q1"])
+                m.update({"answered_positive": r["a1"], "referred": r["r1"], "missed": r["f1"]})
+            out[d] = m
+        return out
+
+    if "reference_diagnosis" in table:
+        diag = t.reference_diagnosis
+        cv, loco = cv.assign(reference_diagnosis=cv.slide_id.map(diag)), loco.assign(
+            reference_diagnosis=loco.slide_id.map(diag))
+        cv_by_diag = by_diagnosis(cv, conformal.get("global"))   # in-sample quantiles: optimistic, like the CV ECE
+        loco_by_diag = {k: by_diagnosis(g, conformal.get(k)) for k, g in loco.groupby("evaluation")}
+    else:
+        cv_by_diag, loco_by_diag = {}, {}
 
     def worst(d: dict, key: str, fn):
         """Worst held-out centre; None unless every centre was measured."""
@@ -249,6 +271,10 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             "loco": loco_cal, "loco_raw": loco_raw,
             "loco_by_domain": {k: {d: metrics(gd) for d, gd in g.groupby("domain")}
                                for k, g in loco.groupby("evaluation")},
+            "cv_by_diagnosis": cv_by_diag, "loco_by_diagnosis": loco_by_diag,
+            "loco_worst_sensitivity_by_diagnosis": {
+                d: worst({k: v.get(d, {}) for k, v in loco_by_diag.items()}, "sensitivity", min)
+                for d in sorted({d for v in loco_by_diag.values() for d in v})},
             "loco_worst_auroc": worst(loco_cal, "auroc", min),
             "loco_worst_ece": worst(loco_cal, "ece", max),
             "loco_worst_ece_raw": worst(loco_raw, "ece", max),

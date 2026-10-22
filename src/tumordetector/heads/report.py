@@ -1,6 +1,7 @@
 """Validation report (Markdown) of a head, generated at every training run and attached to the model."""
 import pandas as pd
 
+from tumordetector.heads.conformal import at_prevalence
 from tumordetector.mil.report import VERDICT, _fmt, _metric_rows
 
 BATTERY = [
@@ -10,14 +11,53 @@ BATTERY = [
     ("Calibrazione (ECE)", "sì: temperatura globale; in leave-one-center-out stimata senza il centro escluso"),
     ("Copertura conformal", "sì: insiemi per classe (E10); copertura dei positivi sul centro escluso peggiore"),
     ("OOD", "no"),
-    ("Metriche alla prevalenza reale, tasso di rinvio", "no"),
-    ("Sottogruppi (scanner, tipo di campione)", "per centro e per dominio (dataset × centro)"),
+    ("Metriche alla prevalenza reale, tasso di rinvio", "sì: rinvii, PPV e NPV degli insiemi sul centro escluso, "
+     "prevalenza 5–30%; senza soglia"),
+    ("Sottogruppi (scanner, tipo di campione)", "per centro, per dominio (dataset × centro) e per diagnosi "
+     "(micro e macrometastasi)"),
     ("Regressione sui casi difficili", "no"),
 ]
 SPREAD = ["cv/auroc", "cv/ece", "loco_worst_auroc", "loco_worst_ece", "loco_worst_ece_raw", "loco_worst_specificity",
           "robustness/center_probe_auroc", "robustness/center_probe_auroc_all", "robustness/robustness_index",
           "temperature/global", "attention_auroc_mean", "loco_worst_positive_coverage"]
 SPREAD_SUFFIX = ("/auroc", "/ece", "/specificity", "/sensitivity")
+PREVALENCES = [0.05, 0.10, 0.20, 0.30]   # share of positive slides: in CAMELYON17 about 0.35, in practice lower
+
+
+def _diagnosis_lines(m: dict) -> list[str]:
+    """Positives per diagnosis: the subgroup every correction of E9-E11 lost first (micrometastases)."""
+    groups = {"Cross-validation": m.get("cv_by_diagnosis", {}), **m.get("loco_by_diagnosis", {})}
+    if not any(groups.values()):
+        return []
+    rows = [f"| {g} | {d} | {_fmt(v.get('n'))} | {_fmt(v.get('sensitivity'))} | {_fmt(v.get('answered_positive'))} | "
+            f"{_fmt(v.get('referred'))} | {_fmt(v.get('missed'))} |" for g, by in groups.items() for d, v in by.items()]
+    worst = m.get("loco_worst_sensitivity_by_diagnosis", {})
+    return ["### Positivi per diagnosi", "",
+            "Sensibilità alla soglia 0,5 e, con gli insiemi conformal, quota con risposta «positivo», rinviata e "
+            "persa (risposta «negativo»). In cross-validation i quantili sono stimati sulle stesse predizioni: "
+            "ottimista. Sensibilità sul centro escluso peggiore: "
+            + (", ".join(f"{d} **{_fmt(v)}**" for d, v in worst.items()) or "n/d") + ".", "",
+            "| Valutazione | Diagnosi | Vetrini | Sensibilità | Risposta positivo | Rinviati | Persi |",
+            "|---|---|---|---|---|---|---|", *rows, ""]
+
+
+def _prevalence_lines(conformal: dict) -> list[str]:
+    """Rates of the sets on each held-out centre, moved to a prevalence other than the cohort's."""
+    held = {k: v for k, v in conformal.items() if k != "global" and v.get("a1") is not None}
+    if not held:
+        return []
+    rows = []
+    for k, r in held.items():
+        cells = [at_prevalence(r, pi) for pi in PREVALENCES]
+        rows.append(f"| {k} | " + " | ".join(f"{_fmt(c['referral'])} / {_fmt(c['ppv'])} / {_fmt(c['npv'])}"
+                                            for c in cells) + " |")
+    return ["### Alla prevalenza (insiemi conformal, centro escluso)", "",
+            "Rinvii / PPV / NPV delle risposte se la quota di vetrini positivi fosse quella in colonna: tassi del "
+            "centro escluso per classe, ricombinati (E10). Nessuna soglia: il tasso di rinvio accettabile lo "
+            "decidono i patologi.", "",
+            "| Rotazione | " + " | ".join(f"{pi:.0%}" for pi in PREVALENCES) + " |",
+            "|" + "---|" * (1 + len(PREVALENCES)),
+            *rows, ""]
 
 
 def _spread_rows(spread: dict, seeds: list) -> str:
@@ -89,6 +129,8 @@ def render(result: dict, verdict: dict, context: dict) -> str:
         "Temperature (media sui semi): " + ", ".join(f"{k} {_fmt(v)}" for k, v in temp.items()) + ".",
         "",
         *_conformal_lines(m.get("conformal", {}), m.get("loco_worst_positive_coverage")),
+        *_prevalence_lines(m.get("conformal", {})),
+        *_diagnosis_lines(m),
         "### Per centro e per dominio",
         "",
         _metric_rows({**{f"Cross-validation, {k}": v for k, v in m["cv_by_center"].items()},

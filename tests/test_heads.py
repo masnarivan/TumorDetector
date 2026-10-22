@@ -14,7 +14,7 @@ from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
-from tumordetector.heads.conformal import class_quantiles, coverage, prediction_set, quantile
+from tumordetector.heads.conformal import at_prevalence, class_quantiles, coverage, prediction_set, quantile
 from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
 from tumordetector.heads.protocol import (
     center_probe,
@@ -230,6 +230,12 @@ def test_head_protocol_runs_loco_on_every_centre_and_calibrates_without_it(manif
         assert rot["n0"] + rot["n1"] == (dev.center != c).sum() and 0 <= rot["positive_coverage"] <= 1
     worst = min(m["conformal"][f"held-out {c}"]["positive_coverage"] for c in "abcd")
     assert m["loco_worst_positive_coverage"] == worst
+    for c in "abcd":   # positives per diagnosis (all "macro" here): answered, referred or missed, nothing else
+        d = m["loco_by_diagnosis"][f"held-out {c}"]["macro"]
+        assert d["n"] == (dev[dev.center == c].label == 1).sum()
+        assert abs(d["answered_positive"] + d["referred"] + d["missed"] - 1) < 1e-9
+    assert m["loco_worst_sensitivity_by_diagnosis"]["macro"] == min(
+        m["loco_by_diagnosis"][f"held-out {c}"]["macro"]["sensitivity"] for c in "abcd")
     gate = HeadSpec(**{**SPEC, "gate": {**SPEC["gate"], "min_loco_positive_coverage": 1.01}}).gate
     assert any(r.startswith("Copertura conformal") for r in head_gate(m, len(dev), gate)["reasons"])
 
@@ -270,6 +276,7 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert read_json(rep / "calibration.json")["temperature"] > 0
     conformal = read_json(rep / "conformal.json")
     assert conformal["alpha"] == 0.05 and 0 <= conformal["q0"] <= 1 and "Insiemi conformal per classe" in text
+    assert "Positivi per diagnosi" in text and "Alla prevalenza" in text
     client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
     version = client.get_model_version_by_alias("head-ln_metastasis-dummy", "candidate")
     assert version.tags["head_version"] == "1" and float(version.tags["temperature"]) > 0
@@ -332,6 +339,14 @@ def test_conformal_quantile_and_sets_per_class():
     assert has0.tolist() == [True, False, False] and has1.tolist() == [False, False, True]   # 0.5: empty set
     has0, has1 = prediction_set(np.array([0.5]), q0=0.6, q1=0.6)
     assert has0[0] and has1[0]                                    # uncertain: both labels
+
+
+def test_rates_at_another_prevalence_recombine_the_classes():
+    r = {"a1": 0.8, "f1": 0.1, "r1": 0.1, "a0": 0.9, "f0": 0.05, "r0": 0.05}
+    assert at_prevalence(r, 0.5) == pytest.approx({"referral": 0.075, "ppv": 0.8 / 0.85, "npv": 0.9 / 1.0})
+    low = at_prevalence(r, 0.05)
+    assert low["ppv"] < at_prevalence(r, 0.3)["ppv"] and low["npv"] > 0.99      # rare tumour: PPV falls, NPV rises
+    assert at_prevalence({**r, "a1": None}, 0.1) == {"referral": None, "ppv": None, "npv": None}
 
 
 def test_conformal_sets_cover_each_class_on_exchangeable_slides():
