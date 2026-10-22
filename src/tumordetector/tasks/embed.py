@@ -51,11 +51,17 @@ class EmbedSession:
             "dataset": self.cfg.data.name, "device": self.device.type, "dtype": self.cfg.embed.dtype,
             "batch_size": self.cfg.embed.batch_size, "code_version": self.code,
             **{f"tiling.{k}": v for k, v in self.tiling.items()}})
+        self.write_log()
         return self
 
-    def __exit__(self, *exc):
+    def write_log(self) -> pd.DataFrame:
+        """Rewritten after every slide: readable during a long run and kept if the machine stops."""
         log = pd.DataFrame(self.log, columns=["slide_id", "status", "n_tiles", *TIMES, "error"])
         log.to_csv(self.root / "extract_log.csv", index=False)
+        return log
+
+    def __exit__(self, *exc):
+        log = self.write_log()
         self.mlflow.log_artifact(str(self.root / "extract_log.csv"))
         self.mlflow.log_metrics({"slides_embedded": int((log.status == "embedded").sum()),
                                  "slides_cached": int((log.status == "cached").sum()),
@@ -83,7 +89,10 @@ class EmbedSession:
     def record(self, slide_id: str, **rec):
         rec = {"slide_id": slide_id, "status": "", "n_tiles": 0, **dict.fromkeys(TIMES, 0.0), "error": "", **rec}
         self.log.append(rec)
-        print(f"{slide_id}: {rec['status']} ({rec['n_tiles']} tiles, {rec['t_embed_s']} s) {rec['error']}", flush=True)
+        self.write_log()
+        print(f"{slide_id}: {rec['status']} ({rec['n_tiles']} tiles; download {rec['t_download_s']} s, "
+              f"wait {rec['t_wait_s']} s, tiling {rec['t_tile_s']} s, embedding {rec['t_embed_s']} s) {rec['error']}",
+              flush=True)
 
     def embed_slide(self, row, tif: Path, **times):
         from tumordetector.embed.extract import TileDataset, extract
