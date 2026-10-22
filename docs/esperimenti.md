@@ -22,6 +22,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
+| E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | protocollo fissato | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -1934,3 +1935,96 @@ modello).
 **Codice.** `experiments/e14_new_centre.py` (estrazioni, training con il codice del protocollo della
 testa, logit dei vetrini di valutazione, analisi) e `experiments/e14_run.sh`; provato su dati sintetici e
 committato prima dell'esecuzione sui dati reali.
+
+## E15 — Riconoscere un dominio non visto dagli embedding
+
+Protocollo fissato il 22/10/2026, prima di ogni calcolo di questo esperimento. Riferimenti: E3 ed E3b (punteggi
+OOD a distanza su CAMELYON16), E6 (errori della testa sul centro escluso).
+
+**Domanda.** `td task=predict` rinvia oggi i vetrini di un centro o di uno scanner che la versione non ha
+visto, leggendo i **metadati**. Un cambio dentro un centro noto (colorazione, protocollo, conversione, un lotto
+di casi: `normal_144`, i casi metastatici di Radboud del 2015 in E3b) nei metadati non si vede. Un punteggio
+calcolato dagli embedding riconosce i vetrini di un centro mai visto, e in particolare quelli su cui la testa
+sbaglia, senza rinviare i vetrini dei centri visti, e senza rinviare i vetrini con molto tumore (il difetto di
+E3/E3b)?
+
+**Che cosa decide e che cosa no.** Se `predict` aggiunge il motivo di rinvio «dominio non riconosciuto dagli
+embedding», con quale punteggio e con quale regola per la soglia. Non sostituisce il controllo sui metadati, che
+resta. Non è il rinvio per regione proposto da E3b (mostrare al patologo le regioni lontane): quello misura il
+tessuto, questo il dominio del vetrino.
+
+**Dati.** Cohort `ln_metastasis` v1, 771 vetrini di sviluppo, Phikon `057cc0295895`; tile normalizzate L2 (come
+E3). LPON non viene letto. Le predizioni di E6 vengono dalla riesecuzione di E10
+(`data/reports/experiments/e10/e6/predictions.csv`).
+
+**Ruoli, per ogni rotazione del leave-one-centre-out** (centro escluso *c*, 4 rotazioni). Sui vetrini dei tre
+centri di training, con i fold del cohort (per paziente):
+
+- riferimento: fold 0, 1, 2;
+- calibrazione della soglia: fold 3;
+- valutazione in distribuzione: fold 4;
+- valutazione fuori distribuzione: tutti i vetrini di *c*.
+
+**Candidati** (fissati ora, nell'ordine di semplicità):
+
+- **V, vetrino:** media delle tile del vetrino; punteggio = distanza euclidea media dai 5 vetrini più vicini del
+  riferimento (stessa media). Nessuna ricerca sulle tile.
+- **T, tile (S0 di E3):** riferimento = k-center 256 per vetrino di riferimento (`vectordb/reduce.kcenter`, il
+  riassunto del vector DB); per 200 tile a caso del vetrino (seme 0) la distanza dal prototipo più vicino;
+  punteggio = media.
+
+**Soglia.** Conformal come in E3: α = 0,05, il ⌈(n + 1)(1 − α)⌉-esimo punteggio dei vetrini di calibrazione;
+rinvio se il punteggio lo supera.
+
+**Esiti** (per candidato).
+
+- Primari:
+  1. falsi rinvii sulla valutazione in distribuzione, su tutte le rotazioni insieme;
+  2. falsi rinvii sui soli vetrini **positivi** in distribuzione (il difetto di E3b);
+  3. quota dei **falsi positivi di E6 sul centro escluso** (logit LOCO ≥ 0, negativo) che il punteggio rinvia,
+     media sui tre semi: gli errori che il rinvio deve intercettare;
+  4. rilevamento dei vetrini di Utrecht escluso (l'unico scanner diverso).
+- Secondari:
+  - rilevamento per centro escluso e AUROC in distribuzione contro fuori distribuzione, per rotazione;
+  - quota dei falsi negativi di E6 sul centro escluso rinviati, e dei positivi per diagnosi (micro, macro);
+  - falsi rinvii in distribuzione per centro, per dominio e per diagnosi;
+  - **dominio dentro un centro:** per Radboud e Utrecht, una rotazione in più in cui riferimento e calibrazione
+    hanno di quel centro solo i vetrini di CAMELYON17 e la valutazione sono i suoi vetrini di CAMELYON16
+    (anni e conversioni diversi); per Radboud, quota rinviata dei casi del 2015 (anno da
+    `data/reports/experiments/e3b/scan_metadata.csv`) contro gli altri anni.
+
+**Criterio** (fissato ora). Un candidato è **adottabile** se:
+
+1. falsi rinvii in distribuzione ≤ **0,08** (α più il margine di E3b);
+2. falsi rinvii sui positivi in distribuzione ≤ **0,10**;
+3. rinvia almeno il **90%** dei falsi positivi di E6 sul centro escluso;
+4. rileva almeno il **95%** dei vetrini di Utrecht escluso.
+
+Se lo sono entrambi si sceglie V (più semplice, nessuna ricerca sulle tile). Se nessuno lo è, `predict` resta
+con il solo controllo sui metadati e il cambio di dominio dentro un centro resta compito del monitoraggio dei
+negativi confermati (*Ingresso di un centro nuovo*, passo 6).
+
+**Lettura** (fissata ora). Se un candidato rispetta 1, 2 e 4 ma non 3, riconosce lo scanner nuovo ma non gli
+errori della testa sui centri dello stesso scanner (CWZ, Rijnstate, Radboud sono tutti 3DHistech): si riporta
+così, senza adottarlo. Il secondario sul dominio dentro un centro non entra nel criterio: dice se il punteggio
+vede anche i cambi che i metadati non vedono, che è il motivo dell'esperimento, ma i gruppi sono piccoli.
+
+**In produzione.** Riferimento = i riassunti di tutti i vetrini di sviluppo meno un insieme di calibrazione per
+paziente (un fold), soglia con la stessa regola; il riferimento e la soglia diventano un artefatto della
+versione, come la temperatura.
+
+**Limiti.**
+
+- I fold di calibrazione e valutazione hanno circa 120 vetrini per rotazione: il tasso di falsi rinvii ha
+  un'incertezza di circa ±0,02–0,04.
+- Il criterio 3 dipende dai falsi positivi di E6, che cambiano molto tra semi (Utrecht: specificità da 0,09 a
+  0,82): sono il bersaglio giusto, ma sono un bersaglio mobile.
+- Tre centri su quattro hanno lo stesso scanner: un centro nuovo con uno scanner noto è il caso difficile, e
+  qui ne abbiamo tre esempi su un solo scanner.
+- 200 tile per vetrino in T (E3 ne usava 500), per contenere il calcolo mentre gira E14.
+- Un backbone.
+
+**Costo.** Lettura degli embedding di 771 vetrini (12,6 GB), k-center dei vetrini di riferimento, ricerca esatta
+del vicino; stima circa un'ora con quattro thread, accanto a E14.
+
+**Codice.** `experiments/e15_domain.py`; provato su dati sintetici e committato prima dell'esecuzione.
