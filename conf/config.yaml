@@ -28,6 +28,9 @@ embed:
   dtype: float16
   device: auto       # auto | cuda | mps | cpu
 
+stream:              # td task=stream
+  prefetch: 2        # slides downloaded in parallel ahead of the one being embedded (disk: prefetch + 1 slides)
+
 vectordb:            # Qdrant; the API key comes from the environment (TD_QDRANT_API_KEY in .env), never from here
   url: ${oc.env:TD_QDRANT_URL,http://localhost:6333}
   rebuild: false     # drop and reload the backbone's collection

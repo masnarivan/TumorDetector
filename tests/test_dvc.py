@@ -28,6 +28,7 @@ UNTRACKED = {
     "embed.device": "speed (rounding at most, below the float16 the embeddings are stored in)",
     "embed.batch_size": "speed, as embed.device",
     "embed.threads": "speed, as embed.device",
+    "stream.prefetch": "speed: slides downloaded ahead, each checked against the manifest md5",
     "mlflow": "run tracking",
     "vectordb": "the database the index is loaded into (url recorded in data/index/<backbone>.json)",
     "mil.workers": "seeds trained in parallel: each seed runs the same as alone (mil.threads is fixed)",

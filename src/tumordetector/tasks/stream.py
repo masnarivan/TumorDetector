@@ -5,6 +5,8 @@ file, tiling, QC thresholds or tile grid changed.
 """
 import time
 import traceback
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from omegaconf import DictConfig
@@ -39,9 +41,8 @@ def download(cfg: DictConfig, row, raw: Path) -> tuple[Path, bool]:
 
 def run(cfg: DictConfig):
     """For machines with a GPU but little disk (Colab, Kaggle): the disk never holds more than
-    ~2 slides. Resumable: slides whose embeddings are current are skipped without downloading."""
-    import threading
-
+    stream.prefetch + 1 slides. Resumable: slides whose embeddings are current are skipped without
+    downloading."""
     manifest = load_manifest(cfg)
     if cfg.data.slides is not None:
         manifest = manifest.set_index("slide_id").loc[list(cfg.data.slides)].reset_index()
@@ -54,38 +55,38 @@ def run(cfg: DictConfig):
         print(f"{len(todo)} slides to process ({len(manifest) - len(todo) - len(referred)} already done, "
               f"{len(referred)} already referred by QC)", flush=True)
 
-        def fetch(row, box):
-            t0 = time.time()
+        def fetch(row):
+            box, t0 = {}, time.time()
             try:
                 box["tif"], box["fresh"] = download(cfg, row, raw)
             except Exception as e:  # reported by the main loop
                 box["error"] = e
             box["t_download_s"] = round(time.time() - t0, 1)
+            return box
 
-        def start(row):
-            box = {}
-            thread = threading.Thread(target=fetch, args=(row, box))
-            thread.start()
-            return thread, box
-
-        nxt = start(todo[0]) if todo else None
-        for i, row in enumerate(todo):
-            (thread, box), nxt = nxt, start(todo[i + 1]) if i + 1 < len(todo) else None  # prefetch the next slide
-            t0 = time.time()
-            thread.join()
-            times = {"t_wait_s": round(time.time() - t0, 1), "t_download_s": box["t_download_s"]}
-            if "error" in box:
-                session.record(row.slide_id, status="error", error=repr(box["error"]), **times)
-                continue
-            t0 = time.time()
-            try:
-                tile_slide(cfg, row, box["tif"], out)
-            except Exception as e:
-                traceback.print_exc()
-                session.record(row.slide_id, status="error", error=repr(e), **times)
-            else:
-                times["t_tile_s"] = round(time.time() - t0, 1)
-                session.embed_slide(row, box["tif"], **times)
-            if box["fresh"] and not cfg.data.keep_slides:
-                box["tif"].unlink(missing_ok=True)
+        # Download `ahead` slides while the current one is tiled and embedded: on Colab one S3 stream
+        # gives ~30 MB/s, slower than an A100 embeds (61 s to download vs 51 s to process test_003).
+        ahead = max(1, int(cfg.stream.prefetch))
+        with ThreadPoolExecutor(ahead) as pool:
+            pending = deque(pool.submit(fetch, r) for r in todo[:ahead])
+            for i, row in enumerate(todo):
+                if i + ahead < len(todo):
+                    pending.append(pool.submit(fetch, todo[i + ahead]))
+                t0 = time.time()
+                box = pending.popleft().result()
+                times = {"t_wait_s": round(time.time() - t0, 1), "t_download_s": box["t_download_s"]}
+                if "error" in box:
+                    session.record(row.slide_id, status="error", error=repr(box["error"]), **times)
+                    continue
+                t0 = time.time()
+                try:
+                    tile_slide(cfg, row, box["tif"], out)
+                except Exception as e:
+                    traceback.print_exc()
+                    session.record(row.slide_id, status="error", error=repr(e), **times)
+                else:
+                    times["t_tile_s"] = round(time.time() - t0, 1)
+                    session.embed_slide(row, box["tif"], **times)
+                if box["fresh"] and not cfg.data.keep_slides:
+                    box["tif"].unlink(missing_ok=True)
     session.check()

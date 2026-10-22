@@ -146,7 +146,8 @@ def test_cli_refuses_a_tiling_the_backbone_was_not_trained_on(tmp_path, manifest
                   f"paths.out={tmp_path / 'out'}", "tiling.tile_px=256"])
 
 
-def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manifest, monkeypatch):
+@pytest.mark.parametrize("prefetch", [1, 3])
+def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manifest, monkeypatch, prefetch):
     manifest = manifest.assign(file_md5=md5sum(slide_path), label=0, has_xml=False)
     manifest = pd.concat([manifest, manifest.assign(slide_id="already_here")])
     manifest.to_csv(tmp_path / "manifest.csv", index=False)
@@ -165,7 +166,7 @@ def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manife
     monkeypatch.chdir(tmp_path)
     args = ["task=stream", "backbone=dummy", f"data.manifest={tmp_path / 'manifest.csv'}", f"data.raw_dir={raw}",
             "data.slides=null", f"paths.out={tmp_path / 'out'}", "embed.device=cpu", "qc.min_tissue_mm2=0.5",
-            f"mlflow.tracking_uri=sqlite:///{tmp_path / 'mlflow.db'}"]
+            f"mlflow.tracking_uri=sqlite:///{tmp_path / 'mlflow.db'}", f"stream.prefetch={prefetch}"]
     cli.main(args)
     root = tmp_path / "out/embeddings/dummy"
     assert store.list_slides(root) == ["already_here", "synthetic"]
