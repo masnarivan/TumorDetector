@@ -14,6 +14,7 @@ from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
+from tumordetector.heads.conformal import class_quantiles, coverage, prediction_set, quantile
 from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
 from tumordetector.heads.protocol import (
     center_probe,
@@ -221,6 +222,15 @@ def test_head_protocol_runs_loco_on_every_centre_and_calibrates_without_it(manif
     assert (inst.groupby(keys)["rank"].count() <= 20).all() and (inst.groupby(keys).logit.diff().dropna() <= 0).all()
     verdict = head_gate(m, len(dev), HeadSpec(**SPEC).gate)
     assert verdict["status"] in ("passed", "failed") and all(isinstance(r, str) for r in verdict["reasons"])
+    # conformal sets (E10): quantiles for the final model from the CV, per rotation from its inner folds only
+    assert out["conformal"] == m["conformal"]["global"] and out["conformal"]["n0"] + out["conformal"]["n1"] == len(dev)
+    for c in "abcd":
+        rot = m["conformal"][f"held-out {c}"]
+        assert rot["n0"] + rot["n1"] == (dev.center != c).sum() and 0 <= rot["positive_coverage"] <= 1
+    worst = min(m["conformal"][f"held-out {c}"]["positive_coverage"] for c in "abcd")
+    assert m["loco_worst_positive_coverage"] == worst
+    gate = HeadSpec(**{**SPEC, "gate": {**SPEC["gate"], "min_loco_positive_coverage": 1.01}}).gate
+    assert any(r.startswith("Copertura conformal") for r in head_gate(m, len(dev), gate)["reasons"])
 
 
 def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path, monkeypatch, manifest_row):
@@ -256,15 +266,45 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert "DATI INSUFFICIENTI" in text and "held-out d" in text and "Robustness Index" in text
     assert pd.read_csv(rep / "excluded.csv").slide_id.tolist() == ["c00"]
     assert read_json(rep / "calibration.json")["temperature"] > 0
+    conformal = read_json(rep / "conformal.json")
+    assert conformal["alpha"] == 0.05 and 0 <= conformal["q0"] <= 1 and "Insiemi conformal per classe" in text
     client = mlflow.MlflowClient(tracking_uri=uri, registry_uri=uri)
     version = client.get_model_version_by_alias("head-ln_metastasis-dummy", "candidate")
     assert version.tags["head_version"] == "1" and float(version.tags["temperature"]) > 0
+    assert version.tags["centers"] == "a,b,c,d" and version.tags["scanners"] == "s"   # never the external centre
+    assert float(version.tags["conformal_q1"]) == conformal["q1"]
 
     # a relabelled manifest no longer matches the cohort: training refuses
     manifest.assign(reference_diagnosis="negative").pipe(lambda m: m[m.dataset == "d1"]).to_csv(
         tmp_path / "d1.csv", index=False)
     with pytest.raises(SystemExit, match="no longer matches"):
         cli.main(["task=train_head", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}"])
+
+
+# --- conformal sets (experiment E10) ---------------------------------------------------------------
+
+def test_conformal_quantile_and_sets_per_class():
+    assert quantile(np.arange(1, 20) / 20, 0.05) == 0.95          # 19 scores: the 19th, the largest
+    assert quantile(np.arange(1, 19) / 20, 0.05) == 1.0           # 18 are too few: the label always enters
+    has0, has1 = prediction_set(np.array([0.01, 0.5, 0.99]), q0=0.1, q1=0.1)
+    assert has0.tolist() == [True, False, False] and has1.tolist() == [False, False, True]   # 0.5: empty set
+    has0, has1 = prediction_set(np.array([0.5]), q0=0.6, q1=0.6)
+    assert has0[0] and has1[0]                                    # uncertain: both labels
+
+
+def test_conformal_sets_cover_each_class_on_exchangeable_slides():
+    rng = np.random.default_rng(0)
+
+    def draw(n):
+        y = rng.integers(0, 2, n)
+        return sigmoid(rng.normal(np.where(y == 1, 1.5, -1.5), 1.5)), y
+
+    p_cal, y_cal = draw(2000)
+    q = class_quantiles(p_cal, y_cal, alpha=0.1)
+    p, y = draw(20000)
+    c = coverage(p, y, q["q0"], q["q1"])
+    assert abs(c["positive_coverage"] - 0.9) < 0.02 and abs(c["negative_coverage"] - 0.9) < 0.02
+    assert 0 < c["referral"] < 1
 
 
 # --- mitigations (experiment E7) -------------------------------------------------------------------

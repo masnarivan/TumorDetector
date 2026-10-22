@@ -20,6 +20,9 @@ recipe: []                         # mitigations (heads/mitigations.py): balance
 calibration:
   method: temperature              # one global temperature, from out-of-fold logits
   inner_folds: 3                   # leave-one-centre-out: folds of the training centres for its temperature
+conformal:                         # prediction sets per class (E10): {0}, {1} answer; {0,1}, {} refer
+  method: per_class
+  alpha: 0.05
 gate:                              # initial proposals, to be agreed with the pathologists
   min_slides: 100                  # below this a run only checks that the code works
   min_cv_auroc: 0.90
@@ -30,4 +33,5 @@ gate:                              # initial proposals, to be agreed with the pa
   min_robustness_index: 0.5        # first step
   max_center_probe_auroc: null     # negatives; reported, no threshold: near 1 for every recipe (E6-E8)
   max_probe_regression: 0.01       # ... but not above the 'validated' version's probe + this
+  min_loco_positive_coverage: 0.90 # conformal sets, worst held-out centre: 1 - alpha - 0.05 (E10)
 overwrite: false                   # task=cohort only: the cohort file is never rewritten implicitly

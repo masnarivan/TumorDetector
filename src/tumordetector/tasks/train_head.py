@@ -10,7 +10,8 @@ from tumordetector.config import dataset_cfg
 from tumordetector.io import code_version, write_json
 
 
-def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_folds: int, recipe: list) -> dict:
+def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_folds: int, recipe: list,
+                alpha: float) -> dict:
     """The whole protocol for one seed; module level so a worker process can run it."""
     import torch
 
@@ -22,7 +23,7 @@ def _train_seed(roots: dict, table: pd.DataFrame, mil: dict, seed: int, inner_fo
     # memory-mapped: parallel workers share one copy of the embeddings in the page cache
     bags = {s: np.load(root / f"{s}.npy", mmap_mode="r") for s, root in root_of.items()}
     return run_head_protocol(table, bags, lambda s: pd.read_parquet(root_of[s] / f"{s}.parquet").label.to_numpy(),
-                             OmegaConf.create(mil), seed, inner_folds, recipe)
+                             OmegaConf.create(mil), seed, inner_folds, recipe, alpha)
 
 
 def run(cfg: DictConfig):
@@ -55,7 +56,7 @@ def run(cfg: DictConfig):
     check_unchanged(cohort, spec, manifests)
     roots, ident = embedding_roots({name: d.out for name, d in datasets.items()}, cfg.backbone.name)
 
-    annot = pd.concat(manifests.values())[["slide_id", "exhaustive_annot"]]
+    annot = pd.concat(manifests.values())[["slide_id", "exhaustive_annot", "scanner"]]
     dev = cohort[cohort.role == "dev"].merge(annot, on="slide_id", validate="one_to_one")
     done = {s for name, root in roots.items() for s in store.list_slides(root)}
     excluded = dev[~dev.slide_id.isin(done)].assign(reason=f"nessun embedding {ident['collection']}")
@@ -69,10 +70,10 @@ def run(cfg: DictConfig):
     workers = min(cfg.mil.workers, len(seeds))
     if workers > 1:
         with ProcessPoolExecutor(workers, mp_context=multiprocessing.get_context("spawn")) as pool:
-            runs = [f.result() for f in [pool.submit(_train_seed, *args, s, spec.calibration.inner_folds, spec.recipe)
-                                         for s in seeds]]
+            runs = [f.result() for f in [pool.submit(_train_seed, *args, s, spec.calibration.inner_folds, spec.recipe,
+                                                     spec.conformal.alpha) for s in seeds]]
     else:
-        runs = [_train_seed(*args, s, spec.calibration.inner_folds, spec.recipe) for s in seeds]
+        runs = [_train_seed(*args, s, spec.calibration.inner_folds, spec.recipe, spec.conformal.alpha) for s in seeds]
 
     metrics, spread = across_seeds([r["metrics"] for r in runs])
     result = {**runs[0], "metrics": metrics, "spread": spread, "seeds": seeds, "excluded": excluded,
@@ -95,6 +96,7 @@ def run(cfg: DictConfig):
                "Versione backbone": ident["version"], "Iperparametri": hyper,
                "Ricetta": ", ".join(spec.recipe) or "nessuna mitigazione",
                "Calibrazione": f"{spec.calibration.method}, {spec.calibration.inner_folds} fold interni nel LOCO",
+               "Insiemi conformal": f"{spec.conformal.method}, alpha {spec.conformal.alpha}",
                "Semi": f"{seeds} (modello e temperatura salvati: seme {seeds[0]})", "Versione codice": code}
 
     rep = (Path(cfg.mil.report_dir) if cfg.mil.report_dir
@@ -108,6 +110,13 @@ def run(cfg: DictConfig):
                    "fitted_on": "out-of-fold logits of the cross-validation", "n_slides": result["n_dev"],
                    "cohort_sha256": cohort_sha}
     write_json(rep / "calibration.json", calibration)
+    # Prediction sets per class (E10), from the same out-of-fold predictions, for the same seed's final model.
+    conformal = {"method": spec.conformal.method, "alpha": spec.conformal.alpha, **(runs[0]["conformal"] or {}),
+                 "seed": seeds[0], "fitted_on": "out-of-fold calibrated probabilities of the cross-validation",
+                 "cohort_sha256": cohort_sha}
+    write_json(rep / "conformal.json", conformal)
+    # What this version has seen: the inference task refers slides of any other centre or scanner.
+    seen = {"centers": ",".join(sorted(table.center.unique())), "scanners": ",".join(sorted(table.scanner.unique()))}
     result["predictions"].to_csv(rep / "predictions.csv", index=False)
     result["attention"].to_csv(rep / "attention.csv", index=False)
     result["instances"].to_csv(rep / "instances.csv", index=False)
@@ -147,7 +156,8 @@ def run(cfg: DictConfig):
                     "head_version": spec.version, "cohort_sha256": cohort_sha,
                     "recipe": ",".join(spec.recipe) or "none",
                     "center_probe_auroc": metrics.get("robustness", {}).get("center_probe_auroc"),
-                    "temperature": calibration["temperature"]}
+                    "temperature": calibration["temperature"], "conformal_alpha": conformal["alpha"],
+                    "conformal_q0": conformal.get("q0"), "conformal_q1": conformal.get("q1"), **seen}
             for k, v in tags.items():
                 client.set_model_version_tag(model_name, version, k, str(v))
     print(f"{model_name}: {result['n_dev']} development slides, battery {verdict['status']}",

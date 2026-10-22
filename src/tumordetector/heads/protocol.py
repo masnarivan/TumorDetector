@@ -20,6 +20,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from tumordetector.heads.conformal import class_quantiles, coverage
 from tumordetector.heads.mitigations import fit_recipe
 from tumordetector.mil.abmil import ABMIL, fit, predict_logits, top_instance_logits
 from tumordetector.mil.evaluate import attention_auroc, binary_metrics
@@ -123,11 +124,13 @@ def robustness(model: ABMIL, table: pd.DataFrame, bags: dict, tile_labels, seed:
 
 
 def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: int, inner_folds: int,
-                      recipe: list[str] = ()) -> dict:
+                      recipe: list[str] = (), alpha: float = 0.05) -> dict:
     """`table`: one row per development slide with embeddings (slide_id, label, center, domain,
     dataset, patient_pseudo_id, cv_fold, exhaustive_annot). `cfg`: the mil section. `recipe`: the
     mitigations (heads/mitigations.py); empty = `abmil.fit`, the training of E6. Every model of the
-    protocol, inner calibration folds included, is trained with the same recipe."""
+    protocol, inner calibration folds included, is trained with the same recipe. `alpha`: of the
+    conformal sets per class (E10): quantiles from the CV for the final model, and in every rotation
+    from its inner folds, so the held-out centre never calibrates its own sets."""
     if (table.role != "dev").any():
         raise ValueError("only development slides enter the protocol: the external test is read on its own")
     t = table.set_index("slide_id")
@@ -177,11 +180,13 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
         if logits is not None:
             oof_ids += test_ids
             oof_logits.append(logits)
-    temperatures = {}
+    temperatures, conformal = {}, {}
     if oof_logits:
         oof_logits = np.concatenate(oof_logits)
         temperatures["global"] = fit_temperature(oof_logits, t.label[oof_ids].to_numpy())
         record(oof_ids, oof_logits, temperatures["global"], "cv", "cv")
+        conformal["global"] = class_quantiles(sigmoid(oof_logits / temperatures["global"]),
+                                              t.label[oof_ids].to_numpy(), alpha)
 
     for c in sorted(table.center.unique()):
         train = table[table.center != c]
@@ -202,6 +207,10 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             record(test_ids, logits, temperatures[f"held-out {c}"], f"held-out {c}", "loco")
             # the inner out-of-fold logits too: the calibration set of this rotation (E10, conformal)
             record(inner_ids, inner_logits, temperatures[f"held-out {c}"], f"held-out {c}", "loco-calibration")
+            q = class_quantiles(sigmoid(inner_logits / temperatures[f"held-out {c}"]),
+                                t.label[inner_ids].to_numpy(), alpha)
+            conformal[f"held-out {c}"] = {**q, **coverage(sigmoid(logits / temperatures[f"held-out {c}"]),
+                                                          t.label[test_ids].to_numpy(), q["q0"], q["q1"])}
 
     final = None
     if table.label.nunique() == 2:
@@ -232,6 +241,7 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
         "n_dev": int(len(table)), "runs": runs, "predictions": preds, "attention": att, "instances": inst,
         "model": final,
         "temperature": temperatures.get("global"),
+        "conformal": conformal.get("global"),
         "metrics": {
             "cv": metrics(cv), "cv_raw": metrics(cv, "p_raw"),
             "cv_by_center": {k: metrics(g) for k, g in cv.groupby("center")},
@@ -244,6 +254,9 @@ def run_head_protocol(table: pd.DataFrame, bags: dict, tile_labels, cfg, seed: i
             "loco_worst_ece_raw": worst(loco_raw, "ece", max),
             "loco_worst_specificity": worst(loco_cal, "specificity", min),
             "temperature": temperatures,
+            "conformal": conformal,
+            "loco_worst_positive_coverage": worst({k: v for k, v in conformal.items() if k != "global"},
+                                                  "positive_coverage", min),
             "robustness": robustness(final, table, bags, tile_labels, seed, cfg.device) if final is not None else {},
             "attention_auroc_mean": float(att[att.group == "cv"].attention_auroc.mean())
             if (att.group == "cv").any() else None,
@@ -274,6 +287,9 @@ def head_gate(metrics: dict, n_slides: int, gate, previous_probe: float | None =
         ("Robustness Index", rob.get("robustness_index"), ">=", gate.min_robustness_index),
     ]
     notes = []
+    if gate.min_loco_positive_coverage is not None:
+        checks.append(("Copertura conformal dei positivi, centro escluso peggiore",
+                       metrics.get("loco_worst_positive_coverage"), ">=", gate.min_loco_positive_coverage))
     if gate.max_center_probe_auroc is not None:
         checks.append(("AUROC del probe sul centro (vetrini negativi)", probe, "<=", gate.max_center_probe_auroc))
     else:

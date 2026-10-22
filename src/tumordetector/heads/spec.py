@@ -18,6 +18,15 @@ class Calibration(BaseModel):
     inner_folds: int = Field(default=3, ge=2)
 
 
+class Conformal(BaseModel):
+    """Prediction sets per class (experiment E10): quantiles of 1 - p(y) for each true class, from the
+    out-of-fold logits of the cross-validation, applied to the final model like the temperature."""
+    model_config = ConfigDict(extra="forbid")
+
+    method: Literal["per_class"] = "per_class"
+    alpha: float = Field(default=0.05, gt=0, lt=0.5)
+
+
 class Gate(BaseModel):
     """Promotion battery of the head: initial proposals, to be agreed with the pathologists. The
     worst held-out centre counts; ECE is on calibrated probabilities, as the model is used."""
@@ -34,6 +43,9 @@ class Gate(BaseModel):
     # (after E8). It must not exceed the 'validated' version's probe by more than max_probe_regression.
     max_center_probe_auroc: float | None = None
     max_probe_regression: float | None = 0.01
+    # Conformal sets (E10): share of positives whose set holds 1, on the worst held-out centre. None = not
+    # checked. E10's rule: >= 1 - alpha - 0.05.
+    min_loco_positive_coverage: float | None = None
 
 
 class HeadSpec(BaseModel):
@@ -51,6 +63,7 @@ class HeadSpec(BaseModel):
     recipe: list[Literal["balanced", "group_dro", "stat_mix", "adversarial", "adversarial_negatives"]] = []
     # ^ mitigations, heads/mitigations.py; empty = the training of E6
     calibration: Calibration = Calibration()
+    conformal: Conformal = Conformal()
     gate: Gate
     overwrite: bool = False
 

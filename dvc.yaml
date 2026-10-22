@@ -157,6 +157,7 @@ stages:
           - roles
           - recipe
           - calibration
+          - conformal
           - gate
     outs:
       - data/reports/${backbone}/heads/ln_metastasis/model.pt
@@ -166,6 +167,8 @@ stages:
           cache: false
       - data/reports/${backbone}/heads/ln_metastasis/calibration.json:
           cache: false        # the temperature that goes with model.pt: small, read in a diff
+      - data/reports/${backbone}/heads/ln_metastasis/conformal.json:
+          cache: false        # the quantiles of the prediction sets (E10), same model and folds
       - data/reports/${backbone}/heads/ln_metastasis/report.md:
           cache: false
     metrics:

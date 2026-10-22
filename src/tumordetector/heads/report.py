@@ -8,7 +8,7 @@ BATTERY = [
     ("Test esterno bloccato", "no: è un task a parte, una consultazione per versione"),
     ("Robustezza al centro (Robustness Index, probe lineare sul centro)", "sì, sul modello finale"),
     ("Calibrazione (ECE)", "sì: temperatura globale; in leave-one-center-out stimata senza il centro escluso"),
-    ("Copertura conformal", "no"),
+    ("Copertura conformal", "sì: insiemi per classe (E10); copertura dei positivi sul centro escluso peggiore"),
     ("OOD", "no"),
     ("Metriche alla prevalenza reale, tasso di rinvio", "no"),
     ("Sottogruppi (scanner, tipo di campione)", "per centro e per dominio (dataset × centro)"),
@@ -16,7 +16,7 @@ BATTERY = [
 ]
 SPREAD = ["cv/auroc", "cv/ece", "loco_worst_auroc", "loco_worst_ece", "loco_worst_ece_raw", "loco_worst_specificity",
           "robustness/center_probe_auroc", "robustness/center_probe_auroc_all", "robustness/robustness_index",
-          "temperature/global", "attention_auroc_mean"]
+          "temperature/global", "attention_auroc_mean", "loco_worst_positive_coverage"]
 SPREAD_SUFFIX = ("/auroc", "/ece", "/specificity", "/sensitivity")
 
 
@@ -30,6 +30,23 @@ def _spread_rows(spread: dict, seeds: list) -> str:
             lines.append(f"| {p} | " + " | ".join(_fmt(v[k]) for k in ("mean", "sd", "min", "max"))
                          + " | " + " | ".join(_fmt(x) for x in v["values"]) + " |")
     return "\n".join(lines)
+
+
+def _conformal_lines(conformal: dict, worst: float | None) -> list[str]:
+    """Quantiles per class and, per held-out centre, the coverage of its sets (mean over seeds)."""
+    if not conformal:
+        return []
+    g = conformal.get("global", {})
+    rows = [f"| {k} | {_fmt(v.get('q0'))} | {_fmt(v.get('q1'))} | {_fmt(v.get('positive_coverage'))} | "
+            f"{_fmt(v.get('negative_coverage'))} | {_fmt(v.get('referral'))} |"
+            for k, v in conformal.items() if k != "global"]
+    return ["### Insiemi conformal per classe", "",
+            f"Quantili del modello finale (CV fuori fold): q0 {_fmt(g.get('q0'))}, q1 {_fmt(g.get('q1'))}. "
+            "Insieme {0} o {1}: risposta; {0, 1} o vuoto: rinvio. In leave-one-center-out i quantili vengono "
+            f"dai fold interni della rotazione. Copertura dei positivi sul centro escluso peggiore: "
+            f"**{_fmt(worst)}**.", "",
+            "| Rotazione | q0 | q1 | Copertura positivi | Copertura negativi | Rinvii |", "|---|---|---|---|---|---|",
+            *rows, ""]
 
 
 def render(result: dict, verdict: dict, context: dict) -> str:
@@ -71,6 +88,7 @@ def render(result: dict, verdict: dict, context: dict) -> str:
         "",
         "Temperature (media sui semi): " + ", ".join(f"{k} {_fmt(v)}" for k, v in temp.items()) + ".",
         "",
+        *_conformal_lines(m.get("conformal", {}), m.get("loco_worst_positive_coverage")),
         "### Per centro e per dominio",
         "",
         _metric_rows({**{f"Cross-validation, {k}": v for k, v in m["cv_by_center"].items()},
