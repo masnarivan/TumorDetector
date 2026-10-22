@@ -22,7 +22,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
-| E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | protocollo fissato | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
+| E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2028,3 +2028,71 @@ versione, come la temperatura.
 del vicino; stima circa un'ora con quattro thread, accanto a E14.
 
 **Codice.** `experiments/e15_domain.py`; provato su dati sintetici e committato prima dell'esecuzione.
+
+### Risultati (22/10/2026)
+
+Codice `1023e84` (lo script di `ac8973e` più una correzione della sola tabella secondaria: la colonna dei falsi
+negativi di E6 ripeteva su ogni rotazione la media di tutte; nessun numero primario cambia). Circa 3 minuti, non
+un'ora: i riassunti dei vetrini sono letti una volta e messi in cache. Report:
+`data/reports/experiments/e15/summary.md`.
+
+| Candidato | Falsi rinvii in distribuzione (474) | sui positivi | Falsi positivi di E6 rinviati (semi) | Utrecht escluso rilevato | Esito |
+|---|---|---|---|---|---|
+| V | 0,053 | 0,065 | 0,997 (0,990; 1,000; 1,000 su 96, 185, 71) | 1,000 | adottabile |
+| T | 0,042 | 0,077 | 1,000 | 1,000 | adottabile |
+
+**Esito: adottabile V** (entrambi passano; la regola fissata sceglie V).
+
+Secondari:
+
+- **Rilevamento del centro escluso:** CWZ e Utrecht 1,000 con entrambi; Radboud 0,946 (V) e 0,928 (T); Rijnstate
+  0,891 e 0,804. AUROC in contro fuori distribuzione da 0,96 a 1,00.
+- **Falsi negativi di E6 sul centro escluso** (13 slide-seme in tutto, quasi tutti micro): V li rinvia tutti
+  tranne uno, `patient_073_node_3` di Rijnstate (micro, punteggio 0,387 contro soglia 0,392, in tutti e tre i
+  semi); T li rinvia tutti.
+- **Dominio dentro un centro:** i vetrini CAMELYON16 di Radboud, con riferimento e calibrazione di Radboud dal
+  solo CAMELYON17, sono rilevati per il 99,6% (entrambi). Per Utrecht la quota è 0,90 (V) e 0,88 (T). Casi di
+  Radboud del 2015 in distribuzione: V ne rinvia 2 positivi su 3, T 1 su 3. Tra gli altri anni non ne rinvia
+  nessuno (16 positivi, 30 negativi). La direzione è quella di E3b, ma su 3 vetrini.
+- **Falsi rinvii in distribuzione per gruppo:**
+  - con V: CAMELYON17 Radboud 0,130, Rijnstate 0,093, rotazione «Utrecht escluso» 0,106;
+  - per diagnosi con V: micro 0,108, macro 0,013, negativi 0,046;
+  - con T: macro 0,093, micro 0,065.
+  - Nessuno dei due ripete il difetto di E3/E3b, cioè molto tumore → rinvio: con V i macro sono i meno rinviati.
+
+### Lettura
+
+1. **Il punteggio riconosce il centro, non gli errori.** I criteri 3 e 4 passano perché quasi ogni vetrino di un
+   centro mai visto viene rinviato, con qualunque esito della testa. Il 99–100% dei falsi positivi di E6 rinviati
+   è una conseguenza di questo, non un'abilità di trovare gli errori. Basta però al compito: un centro mai visto va
+   rinviato (principio 6), e il punteggio lo fa anche con lo stesso scanner (CWZ, Rijnstate e Radboud sono tutti
+   3DHistech), dove i metadati sullo scanner non vedono nulla.
+2. **Vede anche cambi che i metadati non vedono.** Per i metadati, CAMELYON16 e CAMELYON17 dello stesso ospedale
+   sono «lo stesso centro». Il punteggio li separa quasi completamente: il controllo sul centro di `predict`
+   risponderebbe, questo punteggio rinvierebbe. È il motivo dell'esperimento, e la risposta è sì.
+3. **Conseguenza per il riferimento in produzione.** Con questa sensibilità, il riferimento deve coprire ogni
+   dominio di sviluppo (CAMELYON16 e 17 di ogni centro), altrimenti rinvia i vetrini di un dominio noto ma
+   assente dal riferimento. È la regola del protocollo (tutto lo sviluppo meno un fold per paziente). Al passo
+   «ingresso di un centro nuovo», i vetrini del centro entrano nel riferimento con la stessa versione. Non è
+   misurato quanti ne servano perché il punteggio smetta di rinviare quel centro: è la domanda gemella di E14,
+   a costo quasi nullo, e la propongo come E15b.
+4. **Cosa paga V rispetto a T:**
+   - il falso negativo di Rijnstate non rinviato;
+   - più falsi rinvii sui micro (0,108 contro 0,065).
+
+   È un rinvio in più, non una risposta sbagliata, ma sui micro, che sono i casi già difficili. La regola fissata
+   resta V; i due punti sono annotati qui e non cambiano l'esito. Se E15b o il monitoraggio li ripetono, la
+   scelta va rivista con una nuova versione del protocollo, non riletta su questi numeri.
+5. **Limiti specifici dei numeri.**
+   - I falsi rinvii per gruppo sono su 54–147 vetrini (0,130 su 54 sono 7 vetrini).
+   - Il segnale del 2015 è su 3 vetrini.
+   - Un solo scanner diverso.
+
+**Cosa cambia.** `predict` (e `external`) aggiungono il motivo di rinvio «dominio non riconosciuto dagli
+embedding» con V:
+- riferimento = medie dei vetrini di sviluppo meno il fold di calibrazione;
+- 5 vicini;
+- soglia conformal α 0,05;
+- riferimento e soglia salvati come artefatto della versione della testa.
+
+Da implementare.
