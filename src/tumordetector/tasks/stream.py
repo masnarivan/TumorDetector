@@ -3,6 +3,7 @@
 The DVC stage of the full dataset: its outputs are persistent and it redoes only the slides whose
 file, tiling, QC thresholds or tile grid changed.
 """
+import time
 import traceback
 from pathlib import Path
 
@@ -54,10 +55,12 @@ def run(cfg: DictConfig):
               f"{len(referred)} already referred by QC)", flush=True)
 
         def fetch(row, box):
+            t0 = time.time()
             try:
                 box["tif"], box["fresh"] = download(cfg, row, raw)
             except Exception as e:  # reported by the main loop
                 box["error"] = e
+            box["t_download_s"] = round(time.time() - t0, 1)
 
         def start(row):
             box = {}
@@ -68,17 +71,21 @@ def run(cfg: DictConfig):
         nxt = start(todo[0]) if todo else None
         for i, row in enumerate(todo):
             (thread, box), nxt = nxt, start(todo[i + 1]) if i + 1 < len(todo) else None  # prefetch the next slide
+            t0 = time.time()
             thread.join()
+            times = {"t_wait_s": round(time.time() - t0, 1), "t_download_s": box["t_download_s"]}
             if "error" in box:
-                session.record(row.slide_id, status="error", error=repr(box["error"]))
+                session.record(row.slide_id, status="error", error=repr(box["error"]), **times)
                 continue
+            t0 = time.time()
             try:
                 tile_slide(cfg, row, box["tif"], out)
             except Exception as e:
                 traceback.print_exc()
-                session.record(row.slide_id, status="error", error=repr(e))
+                session.record(row.slide_id, status="error", error=repr(e), **times)
             else:
-                session.embed_slide(row, box["tif"])
+                times["t_tile_s"] = round(time.time() - t0, 1)
+                session.embed_slide(row, box["tif"], **times)
             if box["fresh"] and not cfg.data.keep_slides:
                 box["tif"].unlink(missing_ok=True)
     session.check()

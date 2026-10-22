@@ -157,6 +157,12 @@ non si mescolano mai: una cartella e una tabella per (backbone, versione).
 `td task=stream` scarica un vetrino alla volta, lo elabora e lo cancella, saltando quelli già fatti
 e quelli già respinti dal QC con le stesse soglie.
 Il notebook `notebooks/extract_colab.ipynb` lo esegue con gli embedding su Google Drive.
+`extract_log.csv` registra per vetrino i secondi di download, attesa del download, tiling + QC ed
+embedding.
+
+Prima dell'estrazione completa, `notebooks/hoptimus_timing.ipynb` (Colab o Kaggle) misura su 7 vetrini
+il modello da solo, la pipeline e la lettura delle tile, e proietta ore di GPU e spazio su tutti gli
+899 vetrini dai conteggi di `notebooks/tile_counts.csv` (`uv run python scripts/tile_counts.py`).
 
 ## Vector DB
 

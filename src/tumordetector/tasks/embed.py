@@ -12,6 +12,10 @@ from omegaconf import DictConfig, OmegaConf
 from tumordetector.io import code_version, read_json
 from tumordetector.tasks.common import load_manifest, select_slides, tiles_sha256
 
+# Seconds per slide in the log. task=stream adds the download (in a background thread, overlapped
+# with the previous slide), the time the loop waited for it, and tiling + QC; task=embed only embeds.
+TIMES = ["t_download_s", "t_wait_s", "t_tile_s", "t_embed_s"]
+
 
 class EmbedSession:
     """A loaded backbone, its collection folder and one MLflow run, shared by `embed` and `stream`."""
@@ -50,7 +54,7 @@ class EmbedSession:
         return self
 
     def __exit__(self, *exc):
-        log = pd.DataFrame(self.log, columns=["slide_id", "status", "n_tiles", "t_embed_s", "error"])
+        log = pd.DataFrame(self.log, columns=["slide_id", "status", "n_tiles", *TIMES, "error"])
         log.to_csv(self.root / "extract_log.csv", index=False)
         self.mlflow.log_artifact(str(self.root / "extract_log.csv"))
         self.mlflow.log_metrics({"slides_embedded": int((log.status == "embedded").sum()),
@@ -77,11 +81,11 @@ class EmbedSession:
                 and qc.get("qc") == OmegaConf.to_container(self.cfg.qc))
 
     def record(self, slide_id: str, **rec):
-        rec = {"slide_id": slide_id, "status": "", "n_tiles": 0, "t_embed_s": 0.0, "error": "", **rec}
+        rec = {"slide_id": slide_id, "status": "", "n_tiles": 0, **dict.fromkeys(TIMES, 0.0), "error": "", **rec}
         self.log.append(rec)
         print(f"{slide_id}: {rec['status']} ({rec['n_tiles']} tiles, {rec['t_embed_s']} s) {rec['error']}", flush=True)
 
-    def embed_slide(self, row, tif: Path):
+    def embed_slide(self, row, tif: Path, **times):
         from tumordetector.embed.extract import TileDataset, extract
 
         sid, cfg = row.slide_id, self.cfg
@@ -90,9 +94,9 @@ class EmbedSession:
             tiles = pd.read_parquet(self.out / "tiles" / f"{sid}.parquet")
             grid = tiles_sha256(tiles)
             if qc["status"] != "pass":
-                return self.record(sid, status=f"referred by QC: {qc['reason']}")
+                return self.record(sid, status=f"referred by QC: {qc['reason']}", **times)
             if self.is_current(row, grid):
-                return self.record(sid, status="cached", n_tiles=len(tiles))
+                return self.record(sid, status="cached", n_tiles=len(tiles), **times)
             t0 = time.time()
             dataset = TileDataset(tif, tiles, self.backbone.transform)
             feats, stats = extract(self.backbone, dataset, cfg.embed.batch_size, cfg.embed.threads)
@@ -102,10 +106,10 @@ class EmbedSession:
             t = round(time.time() - t0, 1)
             self.mlflow.log_metrics({"n_tiles": len(tiles), "t_embed_s": t, "tiles_per_s": len(tiles) / max(t, 1e-9)},
                                     step=len(self.log))
-            self.record(sid, status="embedded", n_tiles=len(tiles), t_embed_s=t)
+            self.record(sid, status="embedded", n_tiles=len(tiles), t_embed_s=t, **times)
         except Exception as e:  # log and move on: one bad slide must not stop an overnight run
             traceback.print_exc()
-            self.record(sid, status="error", error=repr(e))
+            self.record(sid, status="error", error=repr(e), **times)
 
     def check(self):
         if n := sum(r["status"] == "error" for r in self.log):

@@ -171,8 +171,11 @@ def test_cli_stream_deletes_only_what_it_downloaded(tmp_path, slide_path, manife
     assert store.list_slides(root) == ["already_here", "synthetic"]
     assert not (raw / "synthetic.tif").exists()          # downloaded by the run -> removed
     assert (raw / "already_here.tif").exists()           # was there before -> untouched
+    log = pd.read_csv(root / "extract_log.csv")
+    assert (log.status == "embedded").all()
+    assert (log[["t_download_s", "t_wait_s", "t_tile_s", "t_embed_s"]] >= 0).all().all()   # every phase timed
 
-    cli.main(args)                                       # everything current: nothing to download
+    cli.main(args)                                     # everything current: nothing to download
     assert len(pd.read_csv(root / "extract_log.csv")) == 0
 
 
