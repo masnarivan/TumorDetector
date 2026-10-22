@@ -13,6 +13,7 @@ from pydantic import ValidationError
 from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
+from tumordetector.heads.answer import answer
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
 from tumordetector.heads.conformal import class_quantiles, coverage, prediction_set, quantile
 from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
@@ -244,7 +245,8 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
         write_json(root / "collection.json", ident)
         for sid in manifest[manifest.dataset == ds].slide_id:
             if sid != "c00":                                   # one slide not extracted yet
-                store.write_slide(root, sid, bags[sid], pd.DataFrame({"label": labels[sid]}), ident)
+                tiles = pd.DataFrame({"label": labels[sid], "x": np.arange(len(bags[sid])) * 224, "y": 0})
+                store.write_slide(root, sid, bags[sid], tiles, ident)
         cfgs[ds] = OmegaConf.create({"manifest": str(tmp_path / f"{ds}.csv"), "out": str(tmp_path / ds)})
     for module in ("tumordetector.tasks.cohort", "tumordetector.tasks.train_head"):
         monkeypatch.setattr(f"{module}.dataset_cfg", cfgs.__getitem__)
@@ -273,6 +275,26 @@ def test_cli_train_head_reads_the_cohort_and_never_the_external_slides(tmp_path,
     assert version.tags["head_version"] == "1" and float(version.tags["temperature"]) > 0
     assert version.tags["centers"] == "a,b,c,d" and version.tags["scanners"] == "s"   # never the external centre
     assert float(version.tags["conformal_q1"]) == conformal["q1"]
+
+    # td task=predict: the candidate answers, but always refers; the locked external test is refused
+    monkeypatch.setattr("tumordetector.tasks.predict.dataset_cfg", cfgs.__getitem__)
+    pred = ["task=predict", "backbone=dummy", *head, f"paths.out={tmp_path / 'out'}", f"mlflow.tracking_uri={uri}"]
+    with pytest.raises(SystemExit, match="locked external test"):
+        cli.main([*pred, "predict.slides=[a01,z01]", "predict.alias=candidate"])
+    with pytest.raises(SystemExit, match="no version"):
+        cli.main([*pred, "predict.slides=[a01]"])                      # nothing validated yet
+    cli.main([*pred, "predict.slides=[a01,c03]", "predict.alias=candidate"])
+    answers = tmp_path / "out/reports/dummy/predictions/ln_metastasis"
+    a = read_json(answers / "a01.json")
+    assert a["decision"] == "rinvio" and a["reasons"][0].startswith("versione non validata") and a["in_development"]
+    assert 0 < a["probability"] < 1 and len(a["top_tiles"]) == 10 and a["conformal"]["q1"] == conformal["q1"]
+    client.set_registered_model_alias("head-ln_metastasis-dummy", "validated", version.version)
+    client.set_model_version_tag("head-ln_metastasis-dummy", version.version, "centers", "b,c,d")
+    cli.main([*pred, "predict.slides=[a01,c03]"])
+    a, c = read_json(answers / "a01.json"), read_json(answers / "c03.json")
+    assert a["validated"] and a["decision"] == "rinvio" and "centro non visto" in a["reasons"][0]
+    assert not any(r.startswith("versione non validata") or "non visto" in r for r in c["reasons"])
+    assert (c["decision"] == "rinvio") == bool(c["reasons"]) and (c["decision"] == "positivo") == (c["set"] == [1])
 
     # a relabelled manifest no longer matches the cohort: training refuses
     manifest.assign(reference_diagnosis="negative").pipe(lambda m: m[m.dataset == "d1"]).to_csv(
@@ -305,6 +327,19 @@ def test_conformal_sets_cover_each_class_on_exchangeable_slides():
     c = coverage(p, y, q["q0"], q["q1"])
     assert abs(c["positive_coverage"] - 0.9) < 0.02 and abs(c["negative_coverage"] - 0.9) < 0.02
     assert 0 < c["referral"] < 1
+
+
+def test_the_answer_refers_with_every_reason():
+    sure = {"q0": 0.2, "q1": 0.2}
+    assert answer(0.95, **sure, validated=True, center_seen=True, scanner_seen=True) == \
+        {"set": [1], "decision": "positivo", "reasons": []}
+    assert answer(0.05, **sure, validated=True, center_seen=None, scanner_seen=None)["decision"] == "negativo"
+    for p, why in ((0.5, "atipico"), ):
+        assert answer(p, **sure, validated=True, center_seen=True, scanner_seen=True)["reasons"][0].startswith(why)
+    unsure = answer(0.5, 0.6, 0.6, validated=True, center_seen=True, scanner_seen=True)
+    assert unsure["set"] == [0, 1] and unsure["reasons"][0].startswith("incerto")
+    many = answer(0.95, **sure, validated=False, center_seen=False, scanner_seen=False)
+    assert many["decision"] == "rinvio" and len(many["reasons"]) == 3 and many["set"] == [1]
 
 
 # --- mitigations (experiment E7) -------------------------------------------------------------------

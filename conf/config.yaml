@@ -4,7 +4,7 @@ defaults:
   - head: ln_metastasis
   - _self_
 
-task: ???            # manifest | tile | embed | index | stream | splits | cohort | train | train_head
+task: ???            # manifest | tile | embed | index | stream | splits | cohort | train | train_head | predict
 seed: 0
 
 paths:
@@ -62,6 +62,13 @@ mil:                 # ABMIL baseline on frozen embeddings
   report_dir: null   # null = data/reports/<backbone>/abmil; experiments write elsewhere
   register: true     # false for experiments: no model in the registry, no alias
   overwrite_splits: false
+
+predict:             # td task=predict: the answer of a registered head for embedded slides (contract M4)
+  slides: []         # slide ids of the head's datasets; the locked external test is refused
+  alias: validated   # validated | candidate: a version not validated always refers
+  seen_only: true    # refer slides of a centre or scanner the version has not seen (proposed 22/10/2026)
+  top_tiles: 10      # tiles with most attention in the answer
+  out: null          # null = data/reports/<backbone>/predictions/<head>
 
 gate:                # promotion battery: initial proposals, to be agreed with the pathologists
   min_slides: 100    # below this a run only checks that the code works
