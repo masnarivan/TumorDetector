@@ -27,11 +27,11 @@ def run(cfg: DictConfig):
     import torch
 
     from tumordetector.embed import store
-    from tumordetector.heads.answer import answer
     from tumordetector.heads.cohort import cohort_path, embedding_roots
     from tumordetector.heads.protocol import sigmoid
     from tumordetector.heads.spec import HeadSpec
     from tumordetector.mil.abmil import predict_logits
+    from tumordetector.serve.answer import answer
 
     spec = HeadSpec(**OmegaConf.to_container(cfg.head, resolve=True))
     p = cfg.predict

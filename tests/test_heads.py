@@ -13,7 +13,6 @@ from pydantic import ValidationError
 from tumordetector import cli
 from tumordetector.config import CONF_DIR, dataset_cfg
 from tumordetector.embed import store
-from tumordetector.heads.answer import answer
 from tumordetector.heads.cohort import assemble, assign_folds, check_unchanged, cohort_path, embedding_roots
 from tumordetector.heads.conformal import class_quantiles, coverage, prediction_set, quantile
 from tumordetector.heads.mitigations import GroupDRO, StatMix, balanced_weights, dann_lambda, fit_recipe, grad_reverse
@@ -29,6 +28,7 @@ from tumordetector.heads.protocol import (
 from tumordetector.heads.spec import HeadSpec
 from tumordetector.io import read_json, write_json
 from tumordetector.mil.evaluate import across_seeds, binary_metrics
+from tumordetector.serve.answer import answer
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = {"id": "ln", "version": 1, "module": "M4", "task": "binary", "sites": ["C77.3"],
