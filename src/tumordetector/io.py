@@ -54,18 +54,26 @@ def read_json(path: Path):
     return json.loads(Path(path).read_text())
 
 
-def curl(url: str, out: Path, attempts: int = 10):
-    """curl with resume, retried. A connection can stay open while sending nothing, and
-    curl has no timeout for that by default (one download hung for 30+ min): abort below
-    10 kB/s for 60 s, then resume from where it stopped (-C -)."""
-    for i in range(attempts):
-        r = subprocess.run(["curl", "-fsSL", "-C", "-", "--speed-limit", "10000", "--speed-time", "60",
+def curl(url: str, out: Path, attempts: int = 10, min_speed: int = 1_000_000):
+    """curl with resume, retried. A connection can stay open while sending little or nothing, and
+    curl has no timeout for that by default: one download hung for 30+ min, and on Colab single
+    S3 connections dropped to a few kB/s while a new one gets ~15 MB/s. So abort below `min_speed`
+    bytes/s averaged over 60 s and resume from where it stopped (-C -) on a new connection.
+    `attempts` counts only the retries that downloaded nothing, so a slow but moving link finishes."""
+    failures = 0
+    while True:
+        before = out.stat().st_size if out.exists() else 0
+        r = subprocess.run(["curl", "-fsSL", "-C", "-", "--speed-limit", str(min_speed), "--speed-time", "60",
                             "--connect-timeout", "30", "-o", out, url])
         if r.returncode == 0:
             return
-        print(f"  curl exit {r.returncode} on {url.rsplit('/', 1)[-1]}, retry {i + 1}/{attempts}", flush=True)
-        time.sleep(min(60, 5 * 2 ** i))
-    raise OSError(f"download failed after {attempts} attempts: {url}")
+        moved = (out.stat().st_size if out.exists() else 0) > before
+        failures = 0 if moved else failures + 1
+        print(f"  curl exit {r.returncode} on {url.rsplit('/', 1)[-1]} ({'resuming' if moved else 'no progress'}), "
+              f"retry {failures}/{attempts}", flush=True)
+        if failures >= attempts:
+            raise OSError(f"download failed after {attempts} attempts without progress: {url}")
+        time.sleep(1 if moved else min(60, 5 * 2 ** failures))
 
 
 def code_version() -> str:
