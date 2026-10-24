@@ -23,6 +23,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
+| E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | protocollo fissato | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2101,3 +2102,61 @@ embedding» con V:
 - *`predict` ed `external` aggiungono il motivo di rinvio; si disattiva con `predict.domain_check=false`.*
 - *Sui riassunti di E15, la rotazione «CWZ escluso» ridà la stessa soglia (0,39208).*
 - *Le versioni registrate prima di questa modifica vengono rifiutate («train it again»), come quelle senza insiemi conformal.)*
+
+## E16 — H-optimus-0 contro Phikon: centro e spostamento dei normali, a livello di tile
+
+Protocollo fissato il 24/10/2026, dopo l'estrazione H-optimus-0 di tutti gli 899 vetrini di sviluppo e prima
+di ogni calcolo su quegli embedding. Riferimento: Phikon sugli stessi vetrini e sulle stesse tile.
+
+**Domanda.** E6–E12 indicano come causa dei falsi positivi sul centro nuovo lo spostamento dei normali negli
+embedding Phikon, già a livello di tile. Negli embedding H-optimus-0 il centro è meno leggibile e i normali di un
+centro escluso si spostano meno verso il tumore, senza perdere la separazione tumore/normale? È la parte veloce
+del confronto: la testa ABMIL in leave-one-centre-out (E6 con H-optimus-0) è un protocollo successivo, con il
+suo criterio; questo dice se vale la pena aspettarla con attese alte.
+
+**Dati.** Cohort `ln_metastasis` v1, i 771 vetrini di sviluppo; **LPON non viene letto**. Phikon `057cc0295895`,
+H-optimus-0 `b145cc1e6c6b`, stessa griglia (verificata da `td task=verify` prima del calcolo: se un vetrino ha
+una griglia diversa, l'esperimento si ferma). Le tile campionate sono le stesse per i due backbone: per vetrino e
+seme, il campione di E12 (fino a 500 tile tumorali dai positivi con annotazione completa, fino a 200 tile normali
+dai negativi, mai le tile di bordo), semi 0, 1, 2.
+
+**Misure, per backbone** (stesso codice, cambia solo la cartella degli embedding):
+
+1. *Rilevatore di tumore per tile, leave-one-centre-out* (4 rotazioni; la ricetta di E12 e E13: regressione
+   logistica standardizzata, L2, C = 1, classi pesate). Soglia τ: lascia sopra il 95% delle tile tumorali di
+   training. Sul centro escluso: specificità per tile (tile normali dei negativi sotto τ), AUROC per tile tumore
+   (positivi del centro) contro normale (negativi del centro), **spostamento dei normali** = mediana delle
+   log-odds delle tile normali dei negativi del centro escluso meno la mediana sulle tile normali dei negativi di
+   training. Media sui 3 semi; si riporta anche la specificità per vetrino (mediana sui negativi del centro).
+2. *Probe sul centro*: dalle tile normali dei negativi (seme 0), regressione logistica a 4 classi standardizzata,
+   C = 1, 5 fold raggruppati per paziente; AUROC macro one-vs-rest e accuratezza bilanciata. Lo stesso sulle medie
+   dei vetrini (tutti i 771). Quota dei 10 vicini (coseno) dello stesso centro, da vetrini diversi, su 20 000 tile
+   normali (la misura di E2).
+3. *Vicini per la ricerca dei casi simili* (M7, senza vector DB): per ogni centro escluso, 2 000 tile tumorali e
+   2 000 normali del centro (seme 0) cercano le 10 più vicine (coseno) tra le tile campionate dei tre centri di
+   training; precisione@10 = quota dei vicini con la stessa etichetta, media delle due classi.
+
+**Esiti.**
+
+- Primario: specificità per tile sul centro escluso peggiore.
+- Vincolo: AUROC per tile sul centro escluso peggiore.
+- Secondari: spostamento dei normali per centro; probe sul centro (tile e vetrino) e quota dei vicini dello
+  stesso centro; precisione@10 per centro escluso.
+
+**Criterio** (fissato ora, le soglie di E13). H-optimus-0 è **promettente a livello di tile** se rispetto a
+Phikon:
+
+1. la specificità per tile sul centro escluso peggiore sale di almeno **0,10**;
+2. l'AUROC per tile sul centro escluso peggiore non scende più di **0,01**.
+
+Promettente o no, E6 con H-optimus-0 si fa comunque: H-optimus-0 è il backbone dell'MVP per licenza. Il criterio
+dice se ci si aspetta che il backbone da solo risolva il centro nuovo, o se la leva restano i dati del centro
+(E14).
+
+**Limiti.** Un rilevatore lineare sulle tile non è l'ABMIL; le stime sono raggruppate per vetrino (pochi
+negativi per centro: CWZ 58, Rijnstate 60). Il probe dice quanto il centro è leggibile, non quanto disturba la
+testa (E7–E8 hanno mostrato che togliere il centro non basta). Nessun cambio alla griglia o al QC: le tile sono
+quelle di Phikon.
+
+**Codice.** `experiments/e16_backbone.py`, che riusa campione e rilevatore di E12; committato prima
+dell'esecuzione.
