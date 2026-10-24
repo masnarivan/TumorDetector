@@ -2232,3 +2232,25 @@ il primo esito da guardare in E6 è la specificità su Utrecht; se non lo è, E1
 principale anche con il nuovo backbone.
 
 **Codice.** `experiments/e16b_slide.py`, che importa E12; committato prima dell'esecuzione.
+
+**Risultati** (24/10/2026, codice `dcca8f4`, 7 minuti; `data/reports/experiments/e16b/summary.md`). Controllo
+superato: il braccio Phikon coincide con E12 (differenza massima 3,8e-06).
+
+| Centro escluso | Specificità (Phikon → H-optimus-0) | Sensibilità micro | AUROC | Mediana negativi, escluso (training) |
+|---|---|---|---|---|
+| CWZ | 0,718 → 0,948 | 0,841 → 0,928 | 0,908 → 0,994 | 6,02 (3,83) → 1,95 (0,81) |
+| Radboud | 0,684 → **0,989** | 0,883 → 0,872 | 0,958 → 0,990 | 5,10 (3,19) → 1,28 (−0,47) |
+| Rijnstate | 0,939 → 1,000 | 0,846 → 0,846 | 0,965 → 0,967 | 3,90 (3,93) → −0,04 (1,04) |
+| Utrecht | 0,846 → 0,907 | 0,711 → **0,982** | 0,934 → 0,997 | 2,03 (3,16) → **8,44 (−0,79)** |
+
+**Esito secondo il criterio: H-optimus-0 promettente a livello di vetrino.** Specificità peggiore da 0,684 a 0,907
+(+0,22), sensibilità micro peggiore da 0,711 a 0,846 (+0,14), AUROC peggiore da 0,908 a 0,967.
+
+- Anche la variabilità tra semi si riduce: Radboud escluso con Phikon va da 0,49 a 0,88 di specificità, con
+  H-optimus-0 da 0,977 a 0,995.
+- **Lo spostamento di centro non sparisce.** Con Utrecht escluso la mediana dei negativi sale da −0,79 (training) a
+  8,44: tutti i punteggi di Utrecht si spostano in alto di circa 9 log-odds. La specificità regge perché il tumore
+  si separa molto meglio (AUROC 0,997, micro 0,993), non perché il centro non conti più. Per la testa vuol dire che
+  la discriminazione dovrebbe migliorare, mentre la calibrazione su un centro nuovo (ECE di E6, insiemi conformal di
+  E10) resta a rischio: il controllo di dominio di E15 e i dati del centro (E14) restano necessari.
+- È un rilevatore lineare su tile, non l'ABMIL: la conferma per la testa è E6 con H-optimus-0.
