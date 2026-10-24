@@ -25,6 +25,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 | E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
+| E17 | E6 con H-optimus-0: testa ABMIL, leave-one-centre-out, gate, conformal e controllo di dominio | protocollo fissato | se il backbone dell'MVP migliora la testa sul centro mai visto (specificità, micrometastasi) |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2254,3 +2255,46 @@ superato: il braccio Phikon coincide con E12 (differenza massima 3,8e-06).
   la discriminazione dovrebbe migliorare, mentre la calibrazione su un centro nuovo (ECE di E6, insiemi conformal di
   E10) resta a rischio: il controllo di dominio di E15 e i dati del centro (E14) restano necessari.
 - È un rilevatore lineare su tile, non l'ABMIL: la conferma per la testa è E6 con H-optimus-0.
+
+## E17 — E6 con H-optimus-0: la testa sul centro mai visto
+
+Protocollo fissato il 24/10/2026, dopo E16b e prima di ogni addestramento della testa su H-optimus-0. Riferimento:
+E6 (Phikon, stesso cohort, stessi iperparametri).
+
+**Domanda.** Con il backbone dell'MVP, l'ABMIL addestrato su quattro centri senza mitigazioni regge sul centro mai
+visto? E16b (rilevatore lineare) prevede una specificità peggiore molto migliore e una calibrazione ancora a
+rischio (punteggi di Utrecht spostati di circa 9 log-odds): questo lo verifica sulla testa.
+
+**Dati e modello.** Come E6: cohort `ln_metastasis` v1, 771 vetrini di sviluppo, **LPON non letto**; ABMIL con
+`mil` di `conf/config.yaml` (hidden 256, dropout 0,25, lr 2e-4, weight decay 1e-4, 30 epoche, 4096 tile per
+passo), nessuna mitigazione, temperatura globale, tre semi, un thread. Unica differenza: H-optimus-0
+`b145cc1e6c6b` (1536 dimensioni invece di 768). Il codice è quello attuale di `td task=train_head`, che rispetto a
+E6 aggiunge insiemi conformal per classe (E10) e controllo di dominio (E15); la parte di training è invariata (la
+riesecuzione di E6 in E10 coincideva bit per bit).
+
+**Esecuzione.** `td task=train_head backbone=h_optimus_0 head=ln_metastasis`, fuori da DVC (la variabile
+`backbone` di `dvc.yaml` resta `phikon` finché non si decide il passaggio della pipeline). Report in
+`data/reports/h_optimus_0/heads/ln_metastasis/`. Il modello si registra come `head-ln_metastasis-h_optimus_0` con
+alias `candidate` (e `validated` se supera il gate, come per ogni testa). **Il test esterno non si consulta**,
+qualunque sia l'esito: è una decisione da prendere con i patologi.
+
+**Esiti** (media sui semi): la batteria del gate (come E6, più la copertura conformal dei positivi sul centro
+peggiore); per centro escluso: AUROC, sensibilità micro e macro, specificità, ECE calibrata, temperatura della
+rotazione, mediana delle logit dei negativi e dei positivi; per gli insiemi conformal: rinvio e risposte errate
+per centro.
+
+**Criterio** (fissato ora). H-optimus-0 **migliora la testa** sul centro mai visto se rispetto a E6:
+
+1. la specificità peggiore in leave-one-centre-out sale di almeno **0,10** (E6: 0,430);
+2. l'AUROC peggiore in leave-one-centre-out non scende più di **0,01** (E6: 0,974);
+3. la sensibilità micro sul centro peggiore non scende più di **0,05** (E6, dal report per diagnosi).
+
+L'ECE peggiore (E6: 0,293) si riporta senza soglia propria oltre a quella del gate: E16b fa attendere che resti
+alta.
+
+**Che cosa decide.** Se il passaggio di tutta la pipeline a H-optimus-0 (variabile `backbone` di DVC) porta anche
+un guadagno clinico, oltre alla licenza; e da dove ripartono E14 (dati del centro) ed E10/E15 (rinvio) con il
+nuovo backbone.
+
+**Limiti.** Come E6. In più: gli embedding di sviluppo (circa 21 GB) non stanno nella RAM del Mac, quindi i
+tempi non sono confrontabili con E6; i modelli lo sono (stesso seme, un thread, letture memory-mapped).
