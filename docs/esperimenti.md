@@ -23,7 +23,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
-| E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | protocollo fissato | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
+| E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2160,3 +2160,37 @@ quelle di Phikon.
 
 **Codice.** `experiments/e16_backbone.py`, che riusa campione e rilevatore di E12; committato prima
 dell'esecuzione.
+
+**Risultati** (24/10/2026, codice `21850f5`, 5 minuti sul Mac; `data/reports/experiments/e16/summary.md`). Prima
+del calcolo `td task=verify` su H-optimus-0: 399 + 500 vetrini, griglia, hash e pesi coincidono (unica
+discrepanza: il record d'indice della prova del 13/10, `data/index/h_optimus_0.json`, un solo vetrino).
+
+| Centro escluso | Specificità per tile (Phikon → H-optimus-0) | AUROC per tile | Precisione@10 |
+|---|---|---|---|
+| CWZ | 0,999 → 1,000 | 0,994 → 0,999 | 0,853 → 0,990 |
+| Radboud | 1,000 → 1,000 | 0,989 → 0,998 | 0,773 → 0,956 |
+| Rijnstate | 1,000 → 1,000 | 0,999 → 1,000 | 0,945 → 0,989 |
+| Utrecht | 1,000 → 1,000 | **0,979 → 0,997** | 0,908 → 0,976 |
+
+Probe sul centro: AUROC 0,999 per entrambi (tile e vetrino); quota dei 10 vicini dello stesso centro da 0,967 a
+0,910.
+
+**Esito secondo il criterio: non promettente** (+0,001 di specificità peggiore contro +0,10 richiesto). **Ma la
+misura primaria è satura**: anche con Phikon la specificità per tile sul centro escluso è 0,999–1,000, quindi un
+guadagno di 0,10 era impossibile per costruzione. Il criterio, ereditato da E13 senza aver guardato il livello
+di Phikon con questa soglia, non distingue i due backbone. Lettura:
+
+- Con τ al 95% di sensibilità sulle tile tumorali di training, le tile normali campionate (200 per vetrino, senza
+  bordi) stanno tutte sotto soglia, con entrambi i backbone. I falsi positivi di E6 vengono dalla coda delle
+  migliaia di tile di un vetrino, che 200 tile a caso non vedono: E12 lo misura con il top-5 dello stesso
+  classificatore su tutte le tile (specificità peggiore 0,684 con Phikon).
+- Ciò che E16 misura bene migliora con H-optimus-0: AUROC per tile peggiore da 0,979 a 0,997 (Utrecht),
+  precisione@10 tra centri da 0,77–0,95 a 0,96–0,99. La ricerca dei casi simili (M7) tra centri è molto più
+  pulita.
+- Il centro resta leggibile come con Phikon (probe 0,999): H-optimus-0 non toglie il centro dagli embedding,
+  lo rende meno dominante tra i vicini.
+- Lo spostamento dei normali in log-odds non è confrontabile tra backbone (scala del classificatore diversa) ed
+  è instabile tra semi (CWZ con H-optimus-0 da −4,4 a +0,8): non lo uso.
+
+**Conseguenza per E13.** Il suo criterio usa la stessa misura primaria con la stessa soglia: con Phikon partirebbe
+saturo. Va rivisto prima di essere eseguito (annotazione, non riscrittura).
