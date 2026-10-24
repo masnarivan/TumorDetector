@@ -24,6 +24,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
+| E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2194,3 +2195,40 @@ di Phikon con questa soglia, non distingue i due backbone. Lettura:
 
 **Conseguenza per E13.** Il suo criterio usa la stessa misura primaria con la stessa soglia: con Phikon partirebbe
 saturo. Va rivisto prima di essere eseguito (annotazione, non riscrittura).
+
+## E16b — H-optimus-0 contro Phikon a livello di vetrino: il classificatore di tile di E12
+
+Protocollo fissato il 24/10/2026, dopo i risultati di E16 e prima di ogni punteggio di vetrino su H-optimus-0.
+Riferimento: il braccio «classificatore di tile, top-5» di E12 con Phikon, **non saturo**: specificità sul centro
+escluso peggiore 0,684 (Radboud), sensibilità micro peggiore 0,711 (Utrecht), AUROC peggiore 0,908.
+
+**Domanda.** E16 misurava le tile normali campionate e saturava a 1,00. I falsi positivi di E6 vengono dalle poche
+tile più sospette di un vetrino negativo. Con lo stesso rilevatore lineare applicato a **tutte** le tile, e il
+vetrino giudicato dalle sue 5 tile più alte, H-optimus-0 riduce i falsi positivi sul centro escluso senza perdere
+le micrometastasi? È ancora un rilevatore lineare, non l'ABMIL: la risposta per la testa è E6 con H-optimus-0.
+
+**Metodo.** Il codice di E12 senza modifiche (`classifier_tops`, `tops_to_scores`, `evaluate`), con la cartella
+degli embedding come unica differenza: per seme (0, 1, 2) e rotazione del leave-one-centre-out, regressione
+logistica sulle tile campionate dei 3 centri di training (fino a 500 tumorali dai positivi annotati, fino a 200
+normali dai negativi); punteggio del vetrino = media delle 5 log-odds più alte su tutte le sue tile; soglia τ:
+lascia sopra il 95% dei positivi dei centri di training con punteggi fuori fold (fold interni `cv_fold mod 3`).
+Cohort `ln_metastasis` v1, 771 vetrini di sviluppo, **LPON non letto**.
+
+**Controllo.** Il braccio Phikon ricalcolato deve coincidere con `data/reports/experiments/e12/tile_classifier.csv`
+(differenza massima delle log-odds ≤ 1e-4); se non coincide, l'esperimento si ferma prima di guardare H-optimus-0.
+
+**Esiti** (media sui semi, per centro escluso): specificità, sensibilità micro e macro, AUROC, AUROC micro contro
+i negativi, mediana dei punteggi dei negativi (centro escluso e training), localizzazione (una delle 5 tile più
+alte è tumore, positivi annotati).
+
+**Criterio** (fissato ora). H-optimus-0 è **promettente a livello di vetrino** se rispetto a Phikon:
+
+1. la specificità sul centro escluso peggiore sale di almeno **0,10**;
+2. la sensibilità micro sul centro escluso peggiore non scende più di **0,05**;
+3. l'AUROC sul centro escluso peggiore non scende più di **0,01**.
+
+**Che cosa decide e che cosa no.** Le attese per E6 con H-optimus-0, che si fa comunque. Se E16b è promettente,
+il primo esito da guardare in E6 è la specificità su Utrecht; se non lo è, E14 (dati del centro) resta la leva
+principale anche con il nuovo backbone.
+
+**Codice.** `experiments/e16b_slide.py`, che importa E12; committato prima dell'esecuzione.
