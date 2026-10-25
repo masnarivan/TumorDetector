@@ -13,10 +13,10 @@ import math
 import sys
 from pathlib import Path
 
+import e10_conformal
 import numpy as np
 import pandas as pd
 import torch
-import e10_conformal
 from e12_tile_score import load_table
 from e16b_slide import roots
 

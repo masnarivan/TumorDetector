@@ -1,35 +1,66 @@
 """E14: slides of a new centre added to the head training, with the criterion fixed in docs/esperimenti.md.
 
-  uv run python experiments/e14_new_centre.py train <seed>   the 48 models of one seed (resumable: one logit
-                                                            file per model in data/reports/experiments/e14/logits)
-  uv run python experiments/e14_new_centre.py analyse       -> data/reports/experiments/e14/summary.md, metrics.csv
+  uv run python experiments/e14_new_centre.py train <seed> [backbone]   the 48 models of one seed (resumable: one
+                                      logit file per model in data/reports/experiments/e14[/<backbone>]/logits)
+  uv run python experiments/e14_new_centre.py analyse [backbone]       -> summary.md, metrics.csv, draws.csv
 
-The references (centre never seen, centre seen, E9 offset) come from the E6 rerun with the inner LOCO logits
-(experiments/e10_run.sh). Seed 0 also trains a control: Utrecht held out with no slide added, which must give
-the E6 rerun's LOCO logits (same training slides in the same order, same seed, one thread).
+Backbone phikon (default, E14) or h_optimus_0 (E14b, in data/reports/experiments/e14/h_optimus_0). The references
+(centre never seen, centre seen, E9 offset) come from the backbone's E6 with the inner LOCO logits: the E6 rerun
+(experiments/e10_run.sh) for Phikon, E17's head for H-optimus-0. Seed 0 also trains a control: Utrecht held out with
+no slide added, which must give those LOCO logits exactly (same training slides in the same order, same seed, one
+thread); training stops if it does not. E14b's draws must be E14's (they depend only on the cohort).
 """
 import math
 import sys
 import time
 from pathlib import Path
 
+import e10_conformal
 import numpy as np
 import pandas as pd
-from e10_conformal import RERUN
-from e12_tile_score import ROOTS, load_table
+from e12_tile_score import load_table
+from e16b_slide import roots
 
 from tumordetector.mil.evaluate import binary_metrics
 
-E14 = Path("data/reports/experiments/e14")
-LOGITS = E14 / "logits"
+BACKBONES = {"phikon": (e10_conformal.RERUN, "E6"),   # backbone -> (its E6 predictions, the experiment)
+             "h_optimus_0": (Path("data/reports/h_optimus_0/heads/ln_metastasis/predictions.csv"), "E17")}
+PHIKON = Path("data/reports/experiments/e14")         # E14; other backbones in a subfolder
+E14, LOGITS, ROOTS, RERUN, REF = PHIKON, PHIKON / "logits", roots("phikon"), *BACKBONES["phikon"]
 NS = [5, 10, 20, 40]
 DRAWS, DRAW_SEED = 3, 0
 SEEDS = [0, 1, 2]
-SPEC_LOSS, SENS_LOSS, MICRO_LOSS = 0.05, 0.05, 0.10   # against the seen centre (CV of E6)
+SPEC_LOSS, SENS_LOSS, MICRO_LOSS = 0.05, 0.05, 0.10   # against the seen centre (CV of E6 / E17)
 GATE_SPEC = 0.80                                     # no single model below the gate's specificity
 MICRO_GAIN = 0.05                                    # retraining beats the offset when both pass
 CLOSED_MIN = 0.05                                    # gap closed only reported where the gap is at least this
 CONTROL = "utrecht"
+
+
+def use(backbone: str):
+    global E14, LOGITS, ROOTS, RERUN, REF
+    if backbone not in BACKBONES:
+        raise SystemExit(__doc__)
+    E14 = PHIKON if backbone == "phikon" else PHIKON / backbone
+    LOGITS, ROOTS = E14 / "logits", roots(backbone)
+    RERUN, REF = BACKBONES[backbone]
+    if not RERUN.exists():
+        raise SystemExit(f"{RERUN} missing: run experiments/e10_run.sh (phikon) or train the head (E17) first")
+
+
+def draws_table(table: pd.DataFrame) -> pd.DataFrame:
+    return pd.DataFrame([{"center": x["center"], "draw": x["draw"], "n": n, "slide_id": sid}
+                         for x in draws(table) for n in NS for sid in x["added"][n]])
+
+
+def check_draws(table: pd.DataFrame):
+    """Another backbone must add the same slides as E14 (paired comparison)."""
+    if E14 == PHIKON:
+        return
+    if not (PHIKON / "draws.csv").exists():
+        raise SystemExit(f"{PHIKON / 'draws.csv'} missing: E14's draws are the reference")
+    if not draws_table(table).equals(pd.read_csv(PHIKON / "draws.csv")):
+        raise SystemExit("draws differ from E14's: the comparison would not be paired")
 
 
 def draws(table: pd.DataFrame) -> list[dict]:
@@ -66,6 +97,8 @@ def train(seed: int):
     torch.set_num_threads(cfg.threads)      # as in td task=train_head: same seed and threads -> same model
     torch.use_deterministic_algorithms(True)
     table = load_table()
+    check_draws(table)
+    rerun = pd.read_csv(RERUN)
     bags = {r.slide_id: np.load(ROOTS[r.dataset] / f"{r.slide_id}.npy", mmap_mode="r") for r in table.itertuples()}
     label = table.set_index("slide_id").label
     LOGITS.mkdir(parents=True, exist_ok=True)
@@ -75,6 +108,8 @@ def train(seed: int):
     for c, d, n, added, ev in jobs:
         path = logit_path(c, d, n, seed)
         if path.exists():
+            if d is None:
+                stop_unless_control(rerun)
             continue
         start = time.time()
         added = set(added)   # cohort order, as the protocol: n = 0 is exactly E6's leave-one-centre-out
@@ -86,6 +121,8 @@ def train(seed: int):
         tmp.rename(path)
         print(f"{time.strftime('%F %T')} seed {seed} {path.stem}: {len(ids)} training slides, "
               f"{time.time() - start:.0f} s", flush=True)
+        if d is None:
+            stop_unless_control(rerun)
 
 
 def score(ev: pd.DataFrame, logit: np.ndarray, temperature: float) -> dict:
@@ -171,34 +208,59 @@ def fmt(x) -> str:
     return "—" if x is None or (isinstance(x, float) and math.isnan(x)) else f"{x:.3f}"
 
 
-def check_control(rerun: pd.DataFrame) -> str:
-    path = logit_path(CONTROL, None, 0, 0)
-    if not path.exists():
-        return "modello di controllo assente"
-    new = pd.read_csv(path).set_index("slide_id").logit
+def control_diff(rerun: pd.DataFrame) -> float:
+    new = pd.read_csv(logit_path(CONTROL, None, 0, 0)).set_index("slide_id").logit
     old = rerun[(rerun.seed == 0) & (rerun.group == "loco") & (rerun.evaluation == f"held-out {CONTROL}")]
-    diff = float(np.abs(old.set_index("slide_id").logit[new.index] - new).max())
-    return f"{CONTROL} escluso senza vetrini aggiunti, seme 0: differenza massima dalle logit LOCO di E6 {diff:.2e}"
+    return float(np.abs(old.set_index("slide_id").logit[new.index] - new).max())
+
+
+def stop_unless_control(rerun: pd.DataFrame):
+    print(f"control: {check_control(rerun)}", flush=True)
+    if control_diff(rerun) != 0:
+        raise SystemExit(f"the control does not give {REF}'s LOCO logits: stopping")
+
+
+def check_control(rerun: pd.DataFrame) -> str:
+    if not logit_path(CONTROL, None, 0, 0).exists():
+        return "modello di controllo assente"
+    return (f"{CONTROL} escluso senza vetrini aggiunti, seme 0: differenza massima dalle logit LOCO di {REF} "
+            f"{control_diff(rerun):.2e}")
+
+
+def paired(s: pd.DataFrame, centers: list[str]) -> list[str]:
+    """Secondary of E14b: difference from E14 (Phikon) on the same draws and evaluation slides."""
+    if E14 == PHIKON or not (PHIKON / "metrics.csv").exists():
+        return []
+    p = summarise(pd.read_csv(PHIKON / "metrics.csv"))
+    lines = ["", "## Confronto appaiato con E14 su Phikon (secondario)", "",
+             "Differenza questo backbone − Phikon, stessi vetrini di valutazione ed estrazioni.", "",
+             "| Centro | Metodo | n | Specificità | Spec. min | Sensibilità | Micro |", "|" + "---|" * 7]
+    for c in centers:
+        for method, n in [("mai visto", 0), ("visto", 0)] + [("riaddestrato", n) for n in NS]:
+            if (method, n, c) in s.index and (method, n, c) in p.index:
+                a, b = s.loc[(method, n, c)], p.loc[(method, n, c)]
+                lines.append(f"| {c} | {method} | {n} | " + " | ".join(
+                    f"{a[k] - b[k]:+.3f}" for k in ("specificity", "spec_min", "sensitivity", "micro")) + " |")
+    return lines
 
 
 def analyse():
-    if not RERUN.exists():
-        raise SystemExit(f"{RERUN} missing: run experiments/e10_run.sh first")
     table, rerun = load_table(), pd.read_csv(RERUN)
+    check_draws(table)
     rows = evaluate(table, rerun)
     missing = len(SEEDS) * DRAWS * len(NS) * table.center.nunique() - (rows.method == "riaddestrato").sum()
     E14.mkdir(parents=True, exist_ok=True)
     rows.to_csv(E14 / "metrics.csv", index=False)
-    pd.DataFrame([{"center": x["center"], "draw": x["draw"], "n": n, "slide_id": sid}
-                  for x in draws(table) for n in NS for sid in x["added"][n]]).to_csv(E14 / "draws.csv", index=False)
+    draws_table(table).to_csv(E14 / "draws.csv", index=False)
     s = summarise(rows)
     centers = sorted(table.center.unique())
 
-    lines = ["# E14 — vetrini di un centro nuovo aggiunti al training", "",
+    title = "E14" if E14 == PHIKON else f"E14b ({E14.name})"
+    lines = [f"# {title} — vetrini di un centro nuovo aggiunti al training", "",
              f"Controllo del codice: {check_control(rerun)}.", "",
              f"Modelli riaddestrati mancanti: {missing}." if missing else "Tutti i 144 modelli riaddestrati presenti.",
              "", "Media su 3 semi × 3 estrazioni, sugli stessi vetrini di valutazione per centro ed estrazione. "
-             "Soglia 0,5. «mai visto» = LOCO di E6, «visto» = CV di E6, «offset» = E9 solo in discesa con i "
+             f"Soglia 0,5. «mai visto» = LOCO di {REF}, «visto» = CV di {REF}, «offset» = E9 solo in discesa con i "
              "negativi tra i vetrini aggiunti. Spec. min = la peggiore dei 9 modelli.", "",
              "| Centro | Metodo | n (aggiunti; positivi) | Specificità (min) | Sensibilità | Micro | Macro | AUROC | "
              "ECE | Mediana negativi / positivi |", "|" + "---|" * 10]
@@ -259,14 +321,17 @@ def analyse():
                 cost[c] = n
     lines += ["", "**Costo d'ingresso:** " + "; ".join(f"{c} {cost.get(c, 'oltre ' + str(max(NS)))}"
                                                     for c in centers) + ".", ""]
+    lines += paired(s, centers)
     (E14 / "summary.md").write_text("\n".join(lines))
     print("\n".join(lines))
 
 
 if __name__ == "__main__":
-    if sys.argv[1:2] == ["train"]:
+    if sys.argv[1:2] == ["train"] and len(sys.argv) in (3, 4):
+        use(sys.argv[3] if len(sys.argv) == 4 else "phikon")
         train(int(sys.argv[2]))
-    elif sys.argv[1:2] == ["analyse"]:
+    elif sys.argv[1:2] == ["analyse"] and len(sys.argv) in (2, 3):
+        use(sys.argv[2] if len(sys.argv) == 3 else "phikon")
         analyse()
     else:
         raise SystemExit(__doc__)
