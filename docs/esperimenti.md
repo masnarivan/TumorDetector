@@ -21,7 +21,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E11 | Offset con pochi negativi del centro nuovo + insiemi conformal per classe sulle logit corrette | fatto: non proponibile; le micrometastasi corrette sono negativi chiari, non incerti | se le micrometastasi perse da E9 diventano rinvii invece che risposte «negativo», e a quale costo in rinvii |
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
-| E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | protocollo fissato | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
+| E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | fatto (Phikon): costo d'ingresso 40 a Utrecht e CWZ; a Utrecht la specificità si chiude con 5, le micrometastasi solo con 40 | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 | E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
@@ -1939,6 +1939,58 @@ modello).
 testa, logit dei vetrini di valutazione, analisi) e `experiments/e14_run.sh`; provato su dati sintetici e
 committato prima dell'esecuzione sui dati reali.
 
+### Risultati (23/10/2026, registrati il 25/10/2026)
+
+Codice `16417b1`; dal 22/10 alle 12:11 al 23/10 alle 05:38, con una ripresa alle 13:45 (lo script riparte dai
+modelli già scritti). Tutti i 144 modelli presenti. Controllo del codice: Utrecht escluso senza vetrini aggiunti,
+seme 0, ridà le logit LOCO di E6 (differenza massima 0). Report: `data/reports/experiments/e14/summary.md`, estrazioni
+in `draws.csv`. Phikon; LPON non letto.
+
+**Costo d'ingresso: Utrecht 40, CWZ 40** (Radboud 5, Rijnstate 0).
+
+Centri dove E6 fallisce, riaddestrato (media su 3 semi × 3 estrazioni; tra parentesi la specificità peggiore dei 9
+modelli):
+
+| Centro | n | Specificità (min) | Sensibilità | Micro | ECE | Esito |
+|---|---|---|---|---|---|---|
+| Utrecht | mai visto | 0,488 (0,083) | 0,980 | 0,956 | 0,274 | no |
+| Utrecht | 5 | 0,954 (0,894) | 0,945 | 0,878 | 0,056 | no: micro |
+| Utrecht | 10 | 0,978 (0,943) | 0,945 | 0,878 | 0,032 | no: micro |
+| Utrecht | 20 | 0,990 (0,972) | 0,940 | 0,866 | 0,025 | no: sensibilità, micro |
+| Utrecht | 40 | 0,974 (0,886) | 0,946 | 0,882 | 0,042 | **sufficiente** |
+| Utrecht | visto | 0,978 (0,947) | 0,991 | 0,980 | 0,030 | — |
+| CWZ | mai visto | 0,733 (0,548) | 0,939 | 0,902 | 0,178 | no |
+| CWZ | 5 | 0,813 (0,571) | 0,913 | 0,860 | 0,147 | no: specificità, minimo |
+| CWZ | 10 | 0,892 (0,581) | 0,859 | 0,769 | 0,113 | no: minimo |
+| CWZ | 20 | 0,860 (0,581) | 0,874 | 0,797 | 0,125 | no: specificità, minimo |
+| CWZ | 40 | 0,981 (0,929) | 0,848 | 0,756 | 0,066 | **sufficiente** |
+| CWZ | visto | 0,940 (0,857) | 0,879 | 0,805 | 0,087 | — |
+
+Offset di E9 con i negativi degli stessi vetrini: a Utrecht mai sufficiente (sensibilità 0,89–0,90, micro
+0,81–0,82: il difetto di E9); a CWZ sufficiente con n = 10 e 40, non con 20 (sensibilità 0,826 contro 0,829
+richiesto). Riaddestrare **rende più dell'offset** solo a Utrecht con n = 40.
+
+**Lettura** (secondo la regola fissata: costo d'ingresso 40 → praticabile ma lento, E13 torna prioritario).
+
+1. **A Utrecht la specificità si chiude subito, le micrometastasi no.** Con 5 vetrini la frazione di distanza
+   chiusa è 0,95 e l'ECE scende da 0,274 a 0,056. Quello che manca è la sensibilità sulle micrometastasi: dal
+   0,956 del centro mai visto (dove tutto è spostato verso l'alto) scende a 0,87–0,88 e non risale fino a 40
+   vetrini. Il centro visto arriva a 0,980 con circa 170 vetrini di Utrecht nel training.
+2. **Utrecht a n = 40 passa di misura.** Micro 0,882 contro 0,880 richiesto, sensibilità 0,946 contro 0,941; su
+   9 modelli e circa 33 micrometastasi di valutazione, è un «sufficiente» fragile.
+3. **A CWZ il limite è la variabilità.** La specificità media è vicina al criterio già con 10 vetrini, ma fino a
+   20 almeno uno dei 9 modelli scende a 0,57–0,58 (condizione 4); la curva non è monotona (n = 20 peggio di
+   n = 10). Con 40 vetrini (circa 13 positivi) il minimo sale a 0,929.
+4. **L'offset costa meno a CWZ e non basta a Utrecht.** A CWZ basta l'offset con circa 7 negativi (n = 10); a
+   Utrecht, l'unico scanner diverso, solo il riaddestramento arriva al criterio.
+5. **Limiti dei numeri:** un solo backbone (Phikon); E17 mostra che con H-optimus-0 il centro mai visto parte
+   molto più in alto (specificità peggiore 0,430 → 0,681), quindi il costo d'ingresso con il backbone dell'MVP va
+   rimisurato prima di usarlo nella decisione con i patologi.
+
+**Cosa cambia.** Il costo d'ingresso su Phikon (40 vetrini con diagnosi per i due centri difficili) è il
+riferimento scritto per E14 su H-optimus-0. Se ripeterlo, e se E13 resta prioritario dopo il passaggio di
+backbone, è da decidere.
+
 ## E15 — Riconoscere un dominio non visto dagli embedding
 
 Protocollo fissato il 22/10/2026, prima di ogni calcolo di questo esperimento. Riferimenti: E3 ed E3b (punteggi
@@ -2104,6 +2156,33 @@ embedding» con V:
 - *`predict` ed `external` aggiungono il motivo di rinvio; si disattiva con `predict.domain_check=false`.*
 - *Sui riassunti di E15, la rotazione «CWZ escluso» ridà la stessa soglia (0,39208).*
 - *Le versioni registrate prima di questa modifica vengono rifiutate («train it again»), come quelle senza insiemi conformal.)*
+
+### Ripetizione con H-optimus-0 (protocollo fissato il 25/10/2026)
+
+Fissata dopo E17 e prima di ogni calcolo di E15 sugli embedding H-optimus-0. E17 ha già salvato con la testa il
+riferimento e la soglia di V (`domain.json`, soglia 0,398), ma non ne ha misurato falsi rinvii e rilevamento.
+
+**Domanda.** Il controllo di dominio adottato (V) regge anche con H-optimus-0: pochi falsi rinvii in
+distribuzione, centri mai visti rilevati, errori della testa rinviati?
+
+**Uguale a E15:** cohort, ruoli per rotazione (riferimento fold 0–2, calibrazione fold 3, in distribuzione fold 4,
+fuori distribuzione il centro escluso, più le due rotazioni CAMELYON16 di Radboud e Utrecht), candidati V e T con
+gli stessi parametri, soglia conformal α 0,05, esiti, criterio (soglie 0,08, 0,10, 90%, 95%) e regola di scelta.
+
+**Diverso:** embedding H-optimus-0 `b145cc1e6c6b` (1536 dimensioni, normalizzate L2); gli errori della testa sono
+quelli di **E17** (logit LOCO della testa H-optimus-0, tre semi, `data/reports/h_optimus_0/heads/ln_metastasis/
+predictions.csv`) invece di quelli di E6. Report in `data/reports/experiments/e15/h_optimus_0/`.
+
+**Che cosa decide.** Se V resta adottabile, il controllo di dominio della testa H-optimus-0 resta com'è. Se lo è
+solo T, si annota e la scelta del punteggio per H-optimus-0 va rivista con una nuova versione. Se nessuno lo è,
+`predict` con H-optimus-0 va usato con `predict.domain_check=false` finché non c'è un punteggio adottabile.
+
+**Lettura** (fissata ora). E16 trova il centro ancora leggibile con H-optimus-0 (probe 0,998): ci si aspetta che
+il rilevamento resti, e che il punteggio continui a riconoscere il centro più che gli errori. E17 ha meno falsi
+positivi sul centro escluso di E6, quindi il criterio 3 si calcola su meno vetrini: si riporta il numero.
+
+**Codice.** `experiments/e15_domain.py h_optimus_0` (stesso script, backbone come argomento; senza argomento ridà
+i numeri di Phikon).
 
 ## E16 — H-optimus-0 contro Phikon: centro e spostamento dei normali, a livello di tile
 

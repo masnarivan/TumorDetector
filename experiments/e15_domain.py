@@ -1,6 +1,8 @@
 """E15: recognising an unseen domain from the embeddings, with the criterion fixed in docs/esperimenti.md.
 
-  uv run python experiments/e15_domain.py   -> data/reports/experiments/e15/summary.md, scores.csv
+  uv run python experiments/e15_domain.py               -> data/reports/experiments/e15/summary.md, scores.csv
+  uv run python experiments/e15_domain.py h_optimus_0   -> data/reports/experiments/e15/h_optimus_0/...: the same
+      protocol on H-optimus-0, with E17's held-out predictions in place of E6's (rerun of 25/10/2026)
 
 Per slide (cached in data/reports/experiments/e15/summaries.npz): the mean of its unit tiles, 200 unit tiles at
 random (seed 0) and its 256 k-center prototypes (vectordb/reduce.kcenter, as in the vector DB). Per rotation:
@@ -14,14 +16,20 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch
-from e10_conformal import RERUN
-from e12_tile_score import ROOTS, load_table
+import e10_conformal
+from e12_tile_score import load_table
+from e16b_slide import roots
 
 from tumordetector.heads.conformal import quantile
 from tumordetector.vectordb.reduce import kcenter, unit
 
-E15 = Path("data/reports/experiments/e15")
+BACKBONES = {"phikon": e10_conformal.RERUN,     # backbone -> its E6 held-out predictions (rerun of E10, E17)
+             "h_optimus_0": Path("data/reports/h_optimus_0/heads/ln_metastasis/predictions.csv")}
+E15 = Path("data/reports/experiments/e15")      # phikon; other backbones in a subfolder (set in main)
 CACHE = E15 / "summaries.npz"
+ROOTS = roots("phikon")
+RERUN = BACKBONES["phikon"]
+HEAD = {"phikon": "E6", "h_optimus_0": "E17"}    # the experiment whose head errors the score must catch
 YEARS = Path("data/reports/experiments/e3b/scan_metadata.csv")
 CANDIDATES = ["V", "T"]                  # protocol order: simplest first
 ALPHA = 0.05
@@ -135,7 +143,7 @@ def judge(m: dict) -> list[str]:
     if m["false_pos"] > MAX_FALSE_POS:
         fails.append(f"falsi rinvii sui positivi {m['false_pos']:.3f} > {MAX_FALSE_POS}")
     if m["fp_caught"] < MIN_FP_CAUGHT:
-        fails.append(f"falsi positivi di E6 rinviati {m['fp_caught']:.3f} < {MIN_FP_CAUGHT}")
+        fails.append(f"falsi positivi di {HEAD} rinviati {m['fp_caught']:.3f} < {MIN_FP_CAUGHT}")
     if m["utrecht"] < MIN_UTRECHT:
         fails.append(f"Utrecht escluso rilevato {m['utrecht']:.3f} < {MIN_UTRECHT}")
     return fails
@@ -150,10 +158,15 @@ def auroc(inside: np.ndarray, outside: np.ndarray) -> float:
     return float(roc_auc_score(np.r_[np.zeros(len(inside)), np.ones(len(outside))], np.r_[inside, outside]))
 
 
-def main():
+def main(backbone: str = "phikon"):
+    global E15, CACHE, ROOTS, RERUN, HEAD
+    HEAD = HEAD[backbone]
+    if backbone != "phikon":
+        E15, ROOTS, RERUN = E15 / backbone, roots(backbone), BACKBONES[backbone]
+        CACHE = E15 / "summaries.npz"
     torch.set_num_threads(THREADS)
     if not RERUN.exists():
-        raise SystemExit(f"{RERUN} missing: run experiments/e10_run.sh first")
+        raise SystemExit(f"{RERUN} missing: run experiments/e10_run.sh (phikon) or train the head (E17) first")
     table = load_table()
     summ = summarise(table)
     scores = evaluate(table, summ)
@@ -165,12 +178,12 @@ def main():
     ind = scores[main_rot & (scores.role == "in distribuzione")]
     out = scores[main_rot & (scores.role == "fuori distribuzione")]
 
-    lines = ["# E15 — riconoscere un dominio non visto dagli embedding", "",
+    lines = [f"# E15 — riconoscere un dominio non visto dagli embedding ({backbone})", "",
              f"α = {ALPHA}; soglia dai vetrini di calibrazione (fold {CAL_FOLD}) di ogni rotazione; riferimento fold "
              f"{', '.join(map(str, REF_FOLDS))}; in distribuzione fold {IN_FOLD}. V = media del vetrino, {K_SLIDES} "
              f"vicini; T = {N_TILES} tile, distanza dal più vicino dei {N_PROTO} prototipi k-center per vetrino.", "",
              "## Primari", "",
-             "| Candidato | Falsi rinvii in distribuzione | sui positivi | Falsi positivi di E6 rinviati (semi) | "
+             f"| Candidato | Falsi rinvii in distribuzione | sui positivi | Falsi positivi di {HEAD} rinviati (semi) | "
              "Utrecht escluso rilevato | Esito |", "|---|---|---|---|---|---|"]
     verdicts = {}
     for c in CANDIDATES:
@@ -185,7 +198,7 @@ def main():
 
     lines += ["", "## Per rotazione (secondari)", "",
               "| Rotazione | Candidato | Falsi rinvii in distribuzione | Rilevamento fuori distribuzione | AUROC | "
-              "Falsi negativi di E6 rinviati | Positivi fuori distribuzione rinviati: micro / macro |",
+              f"Falsi negativi di {HEAD} rinviati | Positivi fuori distribuzione rinviati: micro / macro |",
               "|---|---|---|---|---|---|---|"]
     for rot, g in scores.groupby("rotation", sort=False):
         gi, go = g[g.role == "in distribuzione"], g[g.role == "fuori distribuzione"]
@@ -228,6 +241,6 @@ def main():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1] not in BACKBONES):
         raise SystemExit(__doc__)
-    main()
+    main(*sys.argv[1:])

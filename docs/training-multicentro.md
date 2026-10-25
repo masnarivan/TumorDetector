@@ -81,7 +81,7 @@ Dettagli e numeri in [esperimenti.md](esperimenti.md).
 | E11 | Offset + conformal | Non proponibile: dopo l'offset le micrometastasi perse sono negativi chiari, non incerti |
 | E12 | Punteggi dalle tile (istanze ABMIL, classificatore di tile) | Nessun candidato: anche le tile portano lo spostamento di centro |
 | E13 | Normalizzazione del colore prima dell'embedding (pilota) | Protocollo fissato, in pausa dopo E14 |
-| E14 | Vetrini del centro nuovo aggiunti al training | Protocollo fissato |
+| E14 | Vetrini del centro nuovo aggiunti al training | Fatto (Phikon): costo d'ingresso 40 a Utrecht e CWZ |
 
 Che cosa se ne ricava:
 
