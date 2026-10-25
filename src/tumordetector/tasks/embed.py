@@ -10,7 +10,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from tumordetector.io import code_version, read_json
-from tumordetector.tasks.common import load_manifest, select_slides, tiles_sha256
+from tumordetector.tasks.common import load_manifest, select_slides, slide_file, tiles_sha256, tiling_identity
 
 # Seconds per slide in the log. task=stream adds the download (in a background thread, overlapped
 # with the previous slide), the time the loop waited for it, and tiling + QC; task=embed only embeds.
@@ -38,7 +38,7 @@ class EmbedSession:
         self.backbone.load(self.device)
         self.ident = store.open_collection(self.root, self.backbone)
         self.code = code_version()
-        self.tiling = OmegaConf.to_container(cfg.tiling)
+        self.tiling = tiling_identity(cfg)
         self.log = []
 
     def __enter__(self):
@@ -126,8 +126,7 @@ class EmbedSession:
 
 
 def run(cfg: DictConfig):
-    raw = Path(cfg.data.raw_dir)
     with EmbedSession(cfg) as session:
         for row in select_slides(cfg, load_manifest(cfg)).itertuples():
-            session.embed_slide(row, raw / f"{row.slide_id}.tif")
+            session.embed_slide(row, slide_file(cfg, row.slide_id))
     session.check()

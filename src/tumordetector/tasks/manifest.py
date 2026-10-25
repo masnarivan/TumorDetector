@@ -5,10 +5,11 @@ from omegaconf import DictConfig
 
 
 def run(cfg: DictConfig):
-    from tumordetector.data import camelyon16, camelyon17
+    from tumordetector.data import camelyon16, camelyon17, tcga
     from tumordetector.data.schema import validate_manifest
 
-    builders = {"camelyon16": camelyon16.build_manifest, "camelyon17": camelyon17.build_manifest}
+    builders = {"camelyon16": camelyon16.build_manifest, "camelyon17": camelyon17.build_manifest,
+                "tcga": tcga.build_manifest}
     ok, blocked = validate_manifest(builders[cfg.data.name]())
     out = Path(cfg.data.manifest)
     out.parent.mkdir(parents=True, exist_ok=True)

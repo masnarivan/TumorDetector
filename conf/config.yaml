@@ -4,7 +4,7 @@ defaults:
   - head: ln_metastasis
   - _self_
 
-task: ???            # manifest | tile | embed | index | stream | splits | cohort | train | train_head | predict | external
+task: ???            # manifest | fetch | tile | embed | index | stream | splits | cohort | train | train_head | predict | external
 seed: 0
 
 paths:
@@ -30,6 +30,12 @@ embed:
 
 stream:              # td task=stream
   prefetch: 2        # slides downloaded in parallel ahead of the one being embedded (disk: prefetch + 1 slides)
+  stage_dir: null    # copy each slide here (a local disk) before tiling: raw_dir on Drive is slow to read at random
+  delete_raw: false  # also delete slides that were already in raw_dir (fetched before), once processed
+
+fetch:               # td task=fetch: download only, into raw_dir
+  workers: 4         # slides downloaded in parallel
+  batch: null        # only the manifest rows of this `batch` (TCGA: 1 or 2); null = all
 
 vectordb:            # Qdrant; the API key comes from the environment (TD_QDRANT_API_KEY in .env), never from here
   url: ${oc.env:TD_QDRANT_URL,http://localhost:6333}

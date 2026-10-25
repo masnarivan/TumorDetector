@@ -4,6 +4,8 @@ manifest: data/manifests/camelyon17.csv
 # verify and index see one dataset per folder.
 out: data/camelyon17
 raw_dir: ${oc.env:TD_RAW_DIR,data/raw/camelyon17}
+suffix: .tif                     # file name of a slide in raw_dir: <slide_id><suffix>
+glass_quantile: 0.5              # glass level = this quantile of the scanned area's saturation (qc/tissue.py)
 slides: null                     # null = every manifest slide found in raw_dir; or a list of ids
 verify_md5: true
 keep_slides: false               # task=stream only: keep each .tif after embedding it

@@ -19,7 +19,7 @@ import pandas as pd
 from omegaconf import DictConfig, OmegaConf
 
 from tumordetector.io import array_sha256, read_json
-from tumordetector.tasks.common import load_manifest, tiles_sha256
+from tumordetector.tasks.common import load_manifest, tiles_sha256, tiling_identity
 
 # Files in the output folders that do not belong to a slide.
 NOT_SLIDES = {"embeddings": {"collection.json", "extract_log.csv"}, "qc": set(), "tiles": set()}
@@ -70,7 +70,7 @@ def run(cfg: DictConfig):
     out = Path(cfg.paths.out)
     root = out / "embeddings" / cfg.backbone.name
     manifest = load_manifest(cfg)
-    tiling, qc_cfg = OmegaConf.to_container(cfg.tiling), OmegaConf.to_container(cfg.qc)
+    tiling, qc_cfg = tiling_identity(cfg), OmegaConf.to_container(cfg.qc)
     bad = []
     for row in manifest.itertuples():
         bad += check_slide(row, out, root, tiling, qc_cfg)

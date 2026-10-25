@@ -1,6 +1,6 @@
 """`td task=tile`: tissue mask, QC verdict and tile grid of each slide in raw_dir -> data/tiles, data/qc.
 
-For development on the few slides on this machine: it needs the .tif, so it is not a DVC stage
+For development on the few slides on this machine: it needs the slide files, so it is not a DVC stage
 (the full dataset goes through `task=stream`, which calls `tile_slide` on each downloaded slide).
 """
 from pathlib import Path
@@ -13,7 +13,7 @@ from PIL import Image
 from skimage.segmentation import find_boundaries
 
 from tumordetector.io import atomic_write, md5sum, write_json
-from tumordetector.tasks.common import load_manifest, select_slides
+from tumordetector.tasks.common import load_manifest, select_slides, slide_file, tiling_identity
 
 
 def qc_overlay(thumbnail: np.ndarray, mask: np.ndarray) -> Image.Image:
@@ -33,7 +33,7 @@ def tile_slide(cfg: DictConfig, row, tif: Path, out: Path) -> dict:
     qc_dir.mkdir(parents=True, exist_ok=True)
     slide = openslide.OpenSlide(tif)
     mpp = slide_mpp(slide)
-    tissue = compute_tissue_mask(slide, cfg.tiling.mask_downsample, cfg.tiling.mask_margin)
+    tissue = compute_tissue_mask(slide, cfg.tiling.mask_downsample, cfg.tiling.mask_margin, cfg.data.glass_quantile)
     tiles = make_tile_grid(slide, tissue, cfg.tiling.target_mpp, cfg.tiling.tile_px, cfg.tiling.min_tissue)
 
     xml = tif.with_suffix(".xml")
@@ -54,16 +54,16 @@ def tile_slide(cfg: DictConfig, row, tif: Path, out: Path) -> dict:
         **qc.to_dict(), "file_md5": row.file_md5, "level0_px": list(slide.dimensions),
         "vendor": slide.properties.get(openslide.PROPERTY_NAME_VENDOR),
         "objective_power": slide.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER),
-        "tiling": OmegaConf.to_container(cfg.tiling), "qc": OmegaConf.to_container(cfg.qc)})
+        "tiling": tiling_identity(cfg), "qc": OmegaConf.to_container(cfg.qc)})
     print(f"{sid}: {qc.n_tiles} tiles, {qc.tissue_mm2:.0f} mm2, QC {qc.status} {qc.reason}", flush=True)
     return qc.to_dict()
 
 
 def run(cfg: DictConfig):
-    raw, out = Path(cfg.data.raw_dir), Path(cfg.paths.out)
+    out = Path(cfg.paths.out)
     summary = []
     for row in select_slides(cfg, load_manifest(cfg)).itertuples():
-        tif = raw / f"{row.slide_id}.tif"
+        tif = slide_file(cfg, row.slide_id)
         if not tif.exists():
             raise SystemExit(f"{tif} not found")
         if cfg.data.verify_md5 and md5sum(tif) != row.file_md5:

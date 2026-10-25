@@ -202,6 +202,70 @@ def test_cli_stream_does_not_fetch_a_referred_slide_again(tmp_path, slide_path, 
     assert store.list_slides(tmp_path / "out/embeddings/dummy") == ["synthetic"]
 
 
+@pytest.mark.parametrize("delete_raw", [False, True])
+def test_cli_stream_embeds_fetched_slides_from_a_local_copy(tmp_path, slide_path, manifest, monkeypatch, delete_raw):
+    """raw_dir filled by `task=fetch` (Drive): nothing is downloaded, tiling reads the staged copy."""
+    manifest.assign(file_md5=md5sum(slide_path), label=0, has_xml=False).to_csv(tmp_path / "manifest.csv", index=False)
+    raw, local = tmp_path / "drive", tmp_path / "local"
+    raw.mkdir()
+    shutil.copy(slide_path, raw / "synthetic.tif")
+    read, tile_slide = [], stream.tile_slide
+
+    def tile_and_record(cfg, row, path, out):
+        read.append(path)
+        return tile_slide(cfg, row, path, out)
+
+    monkeypatch.setattr(stream, "tile_slide", tile_and_record)
+    monkeypatch.chdir(tmp_path)
+    cli.main(["task=stream", "backbone=dummy", f"data.manifest={tmp_path / 'manifest.csv'}", f"data.raw_dir={raw}",
+              "data.slides=null", f"paths.out={tmp_path / 'out'}", "embed.device=cpu", "qc.min_tissue_mm2=0.5",
+              f"mlflow.tracking_uri=sqlite:///{tmp_path / 'mlflow.db'}", f"stream.stage_dir={local}",
+              f"stream.delete_raw={str(delete_raw).lower()}"])
+    assert read == [local / "synthetic.tif"]
+    assert store.list_slides(tmp_path / "out/embeddings/dummy") == ["synthetic"]
+    assert list(local.iterdir()) == []                         # the local copy is removed after embedding
+    assert (raw / "synthetic.tif").exists() is not delete_raw
+
+
+def test_cli_fetch_downloads_only_what_is_missing(tmp_path, manifest_row, monkeypatch):
+    from tumordetector.tasks import fetch
+
+    md5 = [f"{i:x}" * 32 for i in range(10, 15)]                # not all digits: read back as text
+    rows = [{**manifest_row, "slide_id": s, "file_md5": md5[i], "has_xml": False, "batch": b}
+            for i, (s, b) in enumerate([("here", 1), ("embedded", 1), ("referred", 1), ("todo", 1), ("other", 2)])]
+    pd.DataFrame(rows).to_csv(tmp_path / "manifest.csv", index=False)
+    raw, out = tmp_path / "raw", tmp_path / "out"
+    raw.mkdir()
+    (raw / "here.svs").write_bytes(b"x")
+    (out / "embeddings/dummy").mkdir(parents=True)
+    (out / "qc").mkdir()
+    (out / "embeddings/dummy/embedded.json").write_text(f'{{"file_md5": "{md5[1]}"}}')
+    (out / "qc/referred.json").write_text(f'{{"status": "refer", "file_md5": "{md5[2]}"}}')
+    fetched = []
+
+    def fake_download(cfg, row, raw):
+        fetched.append(row.slide_id)
+        path = raw / f"{row.slide_id}{cfg.data.suffix}"
+        path.write_bytes(b"slide")
+        return path, True
+
+    monkeypatch.setattr(fetch, "download", fake_download)
+    args = ["task=fetch", "backbone=dummy", "data=tcga", f"data.manifest={tmp_path / 'manifest.csv'}",
+            f"data.raw_dir={raw}", f"paths.out={out}", "fetch.batch=1"]
+    cli.main(args)
+    assert fetched == ["todo"]                                  # batch 2 left out, the other three skipped
+    assert (raw / "todo.svs").exists()
+    cli.main(args)
+    assert fetched == ["todo"]                                  # resumable: nothing left to fetch
+
+    def failing(cfg, row, raw):
+        raise OSError("md5 mismatch")
+
+    monkeypatch.setattr(fetch, "download", failing)
+    with pytest.raises(SystemExit, match="1 slide"):
+        cli.main([*args[:-1], "fetch.batch=2"])
+
+
 def test_vectordb_upsert_is_idempotent_and_search_finds_itself(tiled):
     from qdrant_client import QdrantClient
 
@@ -230,3 +294,28 @@ def test_vectordb_upsert_is_idempotent_and_search_finds_itself(tiled):
         qdrant.ensure_collection(client, {**ident, "dim": 16})
     qdrant.ensure_collection(client, ident, rebuild=True)
     assert qdrant.count(client, name) == 0
+
+
+def test_glass_from_a_low_quantile_keeps_pale_tissue_when_tissue_fills_the_scan():
+    """TCGA: the scanned box is mostly tissue, so its median saturation is pale tissue, not glass."""
+    from tumordetector.qc.tissue import mask_from_thumbnail
+
+    thumb = np.full((200, 200, 3), 255, dtype=np.uint8)          # unscanned
+    thumb[20:180, 20:180] = (240, 240, 238)                        # scanned glass
+    thumb[40:160, 40:100] = (225, 200, 225)                        # pale stroma
+    thumb[40:160, 100:160] = (160, 90, 170)                        # dense tumour
+    pale = (slice(50, 150), slice(50, 90))
+    assert not mask_from_thumbnail(thumb)[pale].any()              # median: the stroma is "glass"
+    assert mask_from_thumbnail(thumb, glass_quantile=0.1)[pale].all()
+
+
+def test_tiling_identity_is_unchanged_for_datasets_on_the_median():
+    from hydra import compose, initialize_config_dir
+
+    from tumordetector.config import CONF_DIR
+    from tumordetector.tasks.common import tiling_identity
+
+    with initialize_config_dir(str(CONF_DIR), version_base=None):
+        c16, tcga = (compose("config", overrides=[f"data={d}"]) for d in ("camelyon16", "tcga"))
+    assert tiling_identity(c16) == OmegaConf.to_container(c16.tiling)     # the records of 899 slides stay current
+    assert tiling_identity(tcga) == {**OmegaConf.to_container(tcga.tiling), "glass_quantile": 0.1}

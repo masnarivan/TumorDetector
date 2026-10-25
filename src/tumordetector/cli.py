@@ -4,6 +4,7 @@ tumordetector/tasks/, so a DVC stage depends only on the code it runs (tests/tes
   td task=manifest                     data/manifests/<dataset>.csv
   td task=tile                         tissue mask, QC verdict and tile grid per local slide (development)
   td task=embed backbone=phikon        embeddings per local slide, resumable (development)
+  td task=fetch data=tcga              download only, several slides at a time, into raw_dir (e.g. Drive)
   td task=stream backbone=phikon       download -> tile -> embed -> delete, slide by slide: the full dataset
   td task=index backbone=phikon        regions + k-center prototypes per slide -> Qdrant
   td task=splits                       data/manifests/<dataset>_splits.csv (cross-validation folds)
@@ -26,7 +27,7 @@ from hydra import compose, initialize_config_dir
 from tumordetector.config import CONF_DIR
 
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
-TASKS = ("manifest", "tile", "embed", "stream", "index", "splits", "cohort", "train", "train_head", "predict",
+TASKS = ("manifest", "fetch", "tile", "embed", "stream", "index", "splits", "cohort", "train", "train_head", "predict",
          "external", "verify")
 
 

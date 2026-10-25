@@ -112,6 +112,21 @@ non ancora coperte.
 Gli esperimenti sugli embedding, con protocollo fissato prima dei risultati, sono in
 [docs/esperimenti.md](docs/esperimenti.md).
 
+## TCGA: altri tessuti per l'MVP
+
+Un campione fisso di 392 vetrini diagnostici TCGA (seno, colon, prostata, polmone, rene) per il
+controllore e la testa del polmone: [docs/mvp.md](docs/mvp.md). Il manifest (`td task=manifest data=tcga`,
+dall'API GDC) è in git e non si rigenera in modo implicito. I vetrini si scaricano prima e si embeddano dopo:
+
+```bash
+uv run td task=fetch data=tcga fetch.batch=1 fetch.workers=16
+```
+
+`fetch` scarica solo, con più download in parallelo (GDC dà ~4 MB/s per connessione) e l'md5 controllato.
+`stream` usa poi i file già in `raw_dir`; con `stream.stage_dir` li copia su un disco locale prima del
+tiling e con `stream.delete_raw=true` li cancella dopo l'embedding. Su Colab:
+`notebooks/tcga_fetch_colab.ipynb` (CPU, verso Drive) e `notebooks/tcga_extract_colab.ipynb` (GPU).
+
 ## Teste e cohort multi-centro
 
 Progetto del training multi-centro con CAMELYON17 e delle teste per tessuto:

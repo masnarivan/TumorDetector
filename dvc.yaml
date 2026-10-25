@@ -35,6 +35,7 @@ stages:
       - src/tumordetector/io.py
       - src/tumordetector/data/camelyon16.py
       - src/tumordetector/data/camelyon17.py
+      - src/tumordetector/data/tcga.py
       - src/tumordetector/data/camelyon_annotations.py
       - src/tumordetector/qc/tissue.py
       - src/tumordetector/wsi/tiling.py
@@ -47,6 +48,7 @@ stages:
           - embed.dtype
       - conf/data/camelyon16.yaml:
           - name
+          - glass_quantile
           - slides
     outs:
       - data/tiles:

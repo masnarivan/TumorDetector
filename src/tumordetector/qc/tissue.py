@@ -6,6 +6,11 @@ and dense lymphoid/tumor tissue (~0.2-0.4). Otsu then splits dense tissue from e
 else and drops the pale tissue (normal_027: 3 mm^2 of tissue found; tumor_094: 91 vs 203 mm^2).
 Here a pixel is tissue if it is clearly more saturated than this slide's glass.
 
+The glass level is the median saturation of the scanned area: right for CAMELYON, where the scanner
+covers the whole slide and glass is most of it. TCGA scanners cover only a box around the tissue, often
+more tissue than glass, and the median is then pale tissue (breast stroma dropped, TCGA-A8-A084: 12% of
+the thumbnail kept instead of 23%). There `glass_quantile` = 0.1 takes the glass from the palest tenth.
+
 Ported from prototype 02 (mil-camelyon16, src/mil/tissue.py). This is the first QC backend;
 an artifact-aware one (e.g. GrandQC) can replace `compute_tissue_mask` behind the same types.
 """
@@ -19,14 +24,20 @@ from skimage import color, morphology
 from tumordetector.wsi.tiling import TissueMask
 
 
-def mask_from_thumbnail(thumb: np.ndarray, margin: float = 0.03, min_object_px: int = 200) -> np.ndarray:
+def mask_from_thumbnail(thumb: np.ndarray, margin: float = 0.03, min_object_px: int = 200,
+                        glass_quantile: float = 0.5) -> np.ndarray:
     hsv = color.rgb2hsv(thumb)
     sat = ndi.median_filter(hsv[..., 1], size=3)          # remove single-pixel noise
     not_black = hsv[..., 2] > 0.2                         # slide edges, marker crosses
-    # Glass level of THIS slide: median saturation of the scanned area. Pure white (255)
-    # is the unscanned part of the slide and would pull the estimate towards 0.
+    # Glass level of THIS slide: median (or `glass_quantile`) saturation of the scanned area. Pure
+    # white (255) is the unscanned part of the slide and would pull the estimate towards 0.
     scanned = (thumb.min(axis=-1) < 250) & not_black
-    background = np.median(sat[scanned]) if scanned.any() else 0.0
+    if not scanned.any():
+        background = 0.0
+    elif glass_quantile == 0.5:
+        background = np.median(sat[scanned])
+    else:
+        background = np.quantile(sat[scanned], glass_quantile)
     mask = (sat > background + margin) & not_black
     # Opening removes 1-2 px wide lines (glass edges, label borders) before the usual clean-up.
     mask = morphology.opening(mask, morphology.disk(1))
@@ -37,11 +48,11 @@ def mask_from_thumbnail(thumb: np.ndarray, margin: float = 0.03, min_object_px: 
 
 
 def compute_tissue_mask(slide: openslide.OpenSlide, target_downsample: float = 64,
-                        margin: float = 0.03) -> TissueMask:
+                        margin: float = 0.03, glass_quantile: float = 0.5) -> TissueMask:
     level = slide.get_best_level_for_downsample(target_downsample)
     thumb = np.asarray(slide.read_region((0, 0), level, slide.level_dimensions[level]).convert("RGB"))
-    return TissueMask(mask=mask_from_thumbnail(thumb, margin), downsample=slide.level_downsamples[level],
-                      thumbnail=thumb)
+    return TissueMask(mask=mask_from_thumbnail(thumb, margin, glass_quantile=glass_quantile),
+                      downsample=slide.level_downsamples[level], thumbnail=thumb)
 
 
 @dataclass

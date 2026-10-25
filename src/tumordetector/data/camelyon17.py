@@ -88,9 +88,9 @@ def build_manifest() -> pd.DataFrame:
     return m
 
 
-def slide_url(slide_id: str) -> str:
-    return f"{BUCKET}/{PREFIX}/images/{slide_id}.tif"
+def slide_url(row) -> str:
+    return f"{BUCKET}/{PREFIX}/images/{row.slide_id}.tif"
 
 
-def annotation_url(slide_id: str) -> str:
-    return f"{BUCKET}/{PREFIX}/annotations/{slide_id}.xml"
+def annotation_url(row) -> str:
+    return f"{BUCKET}/{PREFIX}/annotations/{row.slide_id}.xml"
