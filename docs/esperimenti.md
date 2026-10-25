@@ -25,7 +25,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 | E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
-| E17 | E6 con H-optimus-0: testa ABMIL, leave-one-centre-out, gate, conformal e controllo di dominio | protocollo fissato | se il backbone dell'MVP migliora la testa sul centro mai visto (specificità, micrometastasi) |
+| E17 | E6 con H-optimus-0: testa ABMIL, leave-one-centre-out, gate, conformal e controllo di dominio | fatto: migliora (specificità peggiore 0,430 → 0,681, AUROC −0,006, micro invariata); gate non superato (ECE 0,236, Utrecht ancora spostato) | se il backbone dell'MVP migliora la testa sul centro mai visto (specificità, micrometastasi) |
 
 Dopo E1–E3: ridisegno del vector DB, poi ricerca tra centri, probe tumore/normale sulle tile, mappe
 tumorali da k-NN, verifica delle annotazioni, mappa morfologica, confronto con H-optimus-0.
@@ -2298,3 +2298,44 @@ nuovo backbone.
 
 **Limiti.** Come E6. In più: gli embedding di sviluppo (circa 21 GB) non stanno nella RAM del Mac, quindi i
 tempi non sono confrontabili con E6; i modelli lo sono (stesso seme, un thread, letture memory-mapped).
+
+**Risultati** (25/10/2026, codice `2dca781`, 11 ore sul Mac con i tre semi in parallelo; report in
+`data/reports/h_optimus_0/heads/ln_metastasis/`, modello `head-ln_metastasis-h_optimus_0` v1, alias `candidate`,
+non `validated`). LPON non letto; test esterno non consultato.
+
+| | E6 (Phikon) | E17 (H-optimus-0) | Differenza | Soglia del criterio | Rispettato |
+|---|---|---|---|---|---|
+| **Specificità peggiore in LOCO** | 0,430 | **0,681** (0,305; 0,933; 0,805) | +0,251 | ≥ +0,10 | sì |
+| AUROC peggiore in LOCO | 0,974 | 0,968 (Rijnstate) | −0,006 | ≥ −0,01 | sì |
+| Sensibilità micro, centro peggiore (soglia 0,5) | 0,846 (Rijnstate) | 0,846 (Rijnstate) | 0,000 | ≥ −0,05 | sì |
+| ECE calibrata peggiore in LOCO | 0,293 | 0,236 (0,108–0,390) | −0,057 | (gate ≤ 0,10) | — |
+
+**Esito secondo il criterio: H-optimus-0 migliora la testa sul centro mai visto. Il gate resta non superato**:
+ECE peggiore 0,236 (≤ 0,10), specificità peggiore 0,681 (≥ 0,80), copertura conformal dei positivi sul centro
+peggiore 0,875 (≥ 0,90, Rijnstate). Probe sul centro 0,998 (riportato), Robustness Index 10,8 (E6 2,65).
+
+| Centro escluso | Specificità E6 → E17 | Sens. micro E6 → E17 | ECE E6 → E17 | Mediana logit negativi E6 → E17 | Rinvii conformal E17 |
+|---|---|---|---|---|---|
+| CWZ | 0,770 → 0,914 | 0,942 → 1,000 | 0,186 → 0,089 | −2,7 → −4,7 | 0,118 |
+| Radboud | 0,911 → 0,922 | 0,961 → 0,989 | 0,105 → 0,075 | −3,8 → −5,7 | 0,278 |
+| Rijnstate | 0,972 → 1,000 | 0,846 → 0,846 | 0,033 → 0,018 | −6,4 → −8,0 | 0,025 |
+| Utrecht | **0,492 → 0,681** | 0,956 → 0,982 | **0,273 → 0,236** | **+0,1 → −1,5** | 0,343 |
+
+- **Utrecht resta il problema, più piccolo.** I suoi negativi scendono da +0,1 a −1,5 di logit mediana, ma gli
+  altri centri esclusi stanno tra −4,7 e −8,0: lo spostamento dello scanner Hamamatsu c'è ancora, come prevedeva
+  E16b. Dentro Utrecht, i vetrini di CAMELYON17 vanno peggio (specificità 0,618, ECE 0,307) di quelli di
+  CAMELYON16 (0,734, 0,191).
+- **La variabilità tra semi resta enorme proprio lì**: specificità di Utrecht 0,305; 0,933; 0,805. Con E6 era
+  0,091–0,823. La posizione dei normali di un dominio nuovo continua a non essere vincolata dal training.
+- **Le micrometastasi non peggiorano**; le perse sul centro peggiore sono 2 su 13 a Rijnstate con entrambi i
+  backbone.
+- **Il rinvio fa il suo lavoro ma costa**: con gli insiemi conformal Utrecht rinvia il 34% dei vetrini e Radboud
+  il 28%; la copertura dei positivi scende sotto 0,90 solo a Rijnstate (0,875: i 2 micro persi).
+
+**Conseguenze.**
+
+1. Il passaggio della pipeline a H-optimus-0 è giustificato anche clinicamente, non solo per la licenza: va
+   deciso (variabile `backbone` di `dvc.yaml`).
+2. Il backbone da solo non chiude il centro nuovo con scanner diverso. Le leve restano quelle di E14 (vetrini
+   del centro nel training) e del rinvio (E10, E15), da rifare con H-optimus-0 come riferimento.
+3. Il test esterno (LPON, Philips) resta chiuso: il gate non è superato.

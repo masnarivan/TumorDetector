@@ -1,0 +1,11 @@
+{
+ "alpha": 0.05,
+ "cohort_sha256": "d28e4c48b67509ab8709c77409c449ff09118d5a3bd67649c7aefb182975ee69",
+ "fitted_on": "out-of-fold calibrated probabilities of the cross-validation",
+ "method": "per_class",
+ "n0": 496,
+ "n1": 275,
+ "q0": 0.07681406046079346,
+ "q1": 0.032065410857470056,
+ "seed": 0
+}
