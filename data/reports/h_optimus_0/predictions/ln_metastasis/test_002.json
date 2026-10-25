@@ -1,0 +1,96 @@
+{
+ "alias": "candidate",
+ "center": "radboud",
+ "code_version": "c31b997dc025fa2055a292663ab685879a44007c+dirty",
+ "collection": "h_optimus_0__b145cc1e6c6b",
+ "conformal": {
+  "alpha": 0.05,
+  "q0": 0.07681406046079346,
+  "q1": 0.032065410857470056
+ },
+ "dataset": "camelyon16",
+ "decision": "rinvio",
+ "domain": {
+  "distance": 0.2764490832405479,
+  "k": 5,
+  "threshold": 0.39812648601629286
+ },
+ "head": "ln_metastasis v1",
+ "in_development": true,
+ "logit": 10.623482704162598,
+ "model": "head-ln_metastasis-h_optimus_0",
+ "model_version": 1,
+ "probability": 0.9990129130922072,
+ "reasons": [
+  "versione non validata: la batteria di promozione non \u00e8 superata"
+ ],
+ "scanner": "3DHistech Pannoramic Flash II 250",
+ "set": [
+  1
+ ],
+ "slide_id": "test_002",
+ "temperature": 1.5352375210059601,
+ "top_tiles": [
+  {
+   "attention": 0.017250029370188713,
+   "tile": 9666,
+   "x": 39623,
+   "y": 182448
+  },
+  {
+   "attention": 0.017088966444134712,
+   "tile": 9661,
+   "x": 39623,
+   "y": 181987
+  },
+  {
+   "attention": 0.01707247458398342,
+   "tile": 9657,
+   "x": 39623,
+   "y": 181526
+  },
+  {
+   "attention": 0.016868513077497482,
+   "tile": 9550,
+   "x": 31790,
+   "y": 165401
+  },
+  {
+   "attention": 0.016703341156244278,
+   "tile": 9564,
+   "x": 31329,
+   "y": 165862
+  },
+  {
+   "attention": 0.016608061268925667,
+   "tile": 9536,
+   "x": 32251,
+   "y": 164940
+  },
+  {
+   "attention": 0.015826785936951637,
+   "tile": 9595,
+   "x": 30869,
+   "y": 166783
+  },
+  {
+   "attention": 0.015707379207015038,
+   "tile": 9519,
+   "x": 31329,
+   "y": 164480
+  },
+  {
+   "attention": 0.01570308767259121,
+   "tile": 9689,
+   "x": 39623,
+   "y": 184291
+  },
+  {
+   "attention": 0.015634410083293915,
+   "tile": 9596,
+   "x": 31329,
+   "y": 166783
+  }
+ ],
+ "validated": false
+}

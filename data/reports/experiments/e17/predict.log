@@ -1,0 +1,16 @@
+2026/10/25 10:31:32 INFO mlflow.agent.hint: Load the `instrumenting-with-mlflow-tracing` skill at /Users/ivanmasnari/Desktop/TumorDetector/.venv/lib/python3.12/site-packages/mlflow/assistant/skills/instrumenting-with-mlflow-tracing/SKILL.md before writing any tracing code; it ships with this MLflow install. Set MLFLOW_DISABLE_AGENT_HINT=1 to silence this.
+Downloading artifacts:   0%|          | 0/1 [00:00<?, ?it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 201.09it/s]Downloading artifacts: 100%|██████████| 1/1 [00:00<00:00, 196.54it/s]
+test_001: rinvio (versione non validata: la batteria di promozione non è superata), p = 1.000, insieme [1]
+test_002: rinvio (versione non validata: la batteria di promozione non è superata), p = 0.999, insieme [1]
+normal_001: rinvio (versione non validata: la batteria di promozione non è superata), p = 0.016, insieme [0]
+normal_101: rinvio (versione non validata: la batteria di promozione non è superata), p = 0.007, insieme [0]
+patient_020_node_0: rinvio (versione non validata: la batteria di promozione non è superata), p = 0.021, insieme [0]
+patient_020_node_1: rinvio (versione non validata: la batteria di promozione non è superata), p = 1.000, insieme [1]
+patient_024_node_1: rinvio (versione non validata: la batteria di promozione non è superata), p = 1.000, insieme [1]
+patient_040_node_2: rinvio (versione non validata: la batteria di promozione non è superata), p = 1.000, insieme [1]
+patient_060_node_0: rinvio (versione non validata: la batteria di promozione non è superata), p = 1.000, insieme [1]
+patient_060_node_1: rinvio (versione non validata: la batteria di promozione non è superata), p = 0.018, insieme [0]
+answers -> data/reports/h_optimus_0/predictions/ln_metastasis
+real 7.05
+user 4.87
+sys 1.22

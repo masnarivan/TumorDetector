@@ -1,0 +1,96 @@
+{
+ "alias": "candidate",
+ "center": "utrecht",
+ "code_version": "c31b997dc025fa2055a292663ab685879a44007c+dirty",
+ "collection": "h_optimus_0__b145cc1e6c6b",
+ "conformal": {
+  "alpha": 0.05,
+  "q0": 0.07681406046079346,
+  "q1": 0.032065410857470056
+ },
+ "dataset": "camelyon16",
+ "decision": "rinvio",
+ "domain": {
+  "distance": 0.23337238542880168,
+  "k": 5,
+  "threshold": 0.39812648601629286
+ },
+ "head": "ln_metastasis v1",
+ "in_development": true,
+ "logit": 16.189098358154297,
+ "model": "head-ln_metastasis-h_optimus_0",
+ "model_version": 1,
+ "probability": 0.9999736762373547,
+ "reasons": [
+  "versione non validata: la batteria di promozione non \u00e8 superata"
+ ],
+ "scanner": "Hamamatsu NanoZoomer-XR C12000-01",
+ "set": [
+  1
+ ],
+ "slide_id": "test_001",
+ "temperature": 1.5352375210059601,
+ "top_tiles": [
+  {
+   "attention": 0.0030960217118263245,
+   "tile": 1577,
+   "x": 30187,
+   "y": 19300
+  },
+  {
+   "attention": 0.0030876535456627607,
+   "tile": 504,
+   "x": 24744,
+   "y": 12867
+  },
+  {
+   "attention": 0.0030843690037727356,
+   "tile": 503,
+   "x": 24249,
+   "y": 12867
+  },
+  {
+   "attention": 0.0030820961110293865,
+   "tile": 913,
+   "x": 15341,
+   "y": 15836
+  },
+  {
+   "attention": 0.003080944297835231,
+   "tile": 1645,
+   "x": 15341,
+   "y": 19795
+  },
+  {
+   "attention": 0.003079076064750552,
+   "tile": 711,
+   "x": 27218,
+   "y": 14351
+  },
+  {
+   "attention": 0.0030712808948010206,
+   "tile": 1747,
+   "x": 16331,
+   "y": 20290
+  },
+  {
+   "attention": 0.003069251775741577,
+   "tile": 1675,
+   "x": 30187,
+   "y": 19795
+  },
+  {
+   "attention": 0.003069117199629545,
+   "tile": 1460,
+   "x": 20290,
+   "y": 18805
+  },
+  {
+   "attention": 0.003068528836593032,
+   "tile": 998,
+   "x": 15341,
+   "y": 16331
+  }
+ ],
+ "validated": false
+}

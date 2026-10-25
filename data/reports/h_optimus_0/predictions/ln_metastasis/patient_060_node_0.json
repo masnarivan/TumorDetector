@@ -1,0 +1,96 @@
+{
+ "alias": "candidate",
+ "center": "rijnstate",
+ "code_version": "c31b997dc025fa2055a292663ab685879a44007c+dirty",
+ "collection": "h_optimus_0__b145cc1e6c6b",
+ "conformal": {
+  "alpha": 0.05,
+  "q0": 0.07681406046079346,
+  "q1": 0.032065410857470056
+ },
+ "dataset": "camelyon17",
+ "decision": "rinvio",
+ "domain": {
+  "distance": 0.2202775152228277,
+  "k": 5,
+  "threshold": 0.39812648601629286
+ },
+ "head": "ln_metastasis v1",
+ "in_development": true,
+ "logit": 12.989492416381836,
+ "model": "head-ln_metastasis-h_optimus_0",
+ "model_version": 1,
+ "probability": 0.9997884633713641,
+ "reasons": [
+  "versione non validata: la batteria di promozione non \u00e8 superata"
+ ],
+ "scanner": "3DHistech Pannoramic Flash II 250",
+ "set": [
+  1
+ ],
+ "slide_id": "patient_060_node_0",
+ "temperature": 1.5352375210059601,
+ "top_tiles": [
+  {
+   "attention": 0.0697883889079094,
+   "tile": 5540,
+   "x": 35476,
+   "y": 155726
+  },
+  {
+   "attention": 0.06838443875312805,
+   "tile": 4304,
+   "x": 23497,
+   "y": 143286
+  },
+  {
+   "attention": 0.06806264072656631,
+   "tile": 5584,
+   "x": 40083,
+   "y": 156647
+  },
+  {
+   "attention": 0.06681688129901886,
+   "tile": 4161,
+   "x": 22576,
+   "y": 141904
+  },
+  {
+   "attention": 0.06674026697874069,
+   "tile": 5559,
+   "x": 34555,
+   "y": 156187
+  },
+  {
+   "attention": 0.06323142349720001,
+   "tile": 5583,
+   "x": 39623,
+   "y": 156647
+  },
+  {
+   "attention": 0.06200135499238968,
+   "tile": 5582,
+   "x": 39162,
+   "y": 156647
+  },
+  {
+   "attention": 0.06047171354293823,
+   "tile": 4303,
+   "x": 23036,
+   "y": 143286
+  },
+  {
+   "attention": 0.05958189442753792,
+   "tile": 5538,
+   "x": 34555,
+   "y": 155726
+  },
+  {
+   "attention": 0.05494341254234314,
+   "tile": 4419,
+   "x": 31790,
+   "y": 144208
+  }
+ ],
+ "validated": false
+}

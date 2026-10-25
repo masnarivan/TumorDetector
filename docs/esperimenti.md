@@ -22,7 +22,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | fatto (Phikon): costo d'ingresso 40 a Utrecht e CWZ; a Utrecht la specificità si chiude con 5, le micrometastasi solo con 40 | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
-| E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
+| E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053). Con H-optimus-0 ancora adottabile V, ma rileva meno (Rijnstate escluso 0,45, CAMELYON16 di Utrecht 0,47) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 | E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
 | E17 | E6 con H-optimus-0: testa ABMIL, leave-one-centre-out, gate, conformal e controllo di dominio | fatto: migliora (specificità peggiore 0,430 → 0,681, AUROC −0,006, micro invariata); gate non superato (ECE 0,236, Utrecht ancora spostato) | se il backbone dell'MVP migliora la testa sul centro mai visto (specificità, micrometastasi) |
@@ -2184,6 +2184,51 @@ positivi sul centro escluso di E6, quindi il criterio 3 si calcola su meno vetri
 **Codice.** `experiments/e15_domain.py h_optimus_0` (stesso script, backbone come argomento; senza argomento ridà
 i numeri di Phikon).
 
+**Risultati** (25/10/2026, codice `d4bf851`, 4 minuti e mezzo; report
+`data/reports/experiments/e15/h_optimus_0/summary.md`). Controllo: lo stesso script senza argomento ridà il report di
+Phikon identico (cambia solo il titolo).
+
+| Candidato | Falsi rinvii in distribuzione (474) | sui positivi | Falsi positivi di E17 rinviati (semi) | Utrecht escluso rilevato | Esito |
+|---|---|---|---|---|---|
+| V | 0,055 | 0,036 | 0,927 (0,971; 0,941; 0,868 su 137, 17, 68) | 1,000 | adottabile |
+| T | 0,023 | 0,065 | 0,902 (0,927; 1,000; 0,779) | 0,984 | adottabile |
+
+**Esito: adottabile V**, come con Phikon. Le soglie per rotazione (0,380–0,408) sono vicine a quella salvata da
+E17 (0,398).
+
+Rispetto a Phikon (V):
+
+| | Phikon | H-optimus-0 |
+|---|---|---|
+| Rilevamento CWZ escluso | 1,000 | 0,871 |
+| Rilevamento Radboud escluso | 0,946 | 0,749 |
+| Rilevamento Rijnstate escluso | 0,891 | **0,446** |
+| Rilevamento Utrecht escluso | 1,000 | 1,000 |
+| CAMELYON16 di Radboud (riferimento solo CAMELYON17) | 0,996 | 0,784 |
+| CAMELYON16 di Utrecht (riferimento solo CAMELYON17) | 0,90 | **0,474** |
+| Falsi negativi della testa sul centro escluso rinviati | tutti tranne uno | **nessuno** a Radboud e Rijnstate (tutti a Utrecht) |
+| Falsi rinvii in distribuzione, micro | 0,108 | 0,032 |
+| Falsi rinvii in distribuzione, CAMELYON17 Rijnstate | 0,093 | 0,222 (12 su 54) |
+
+**Lettura.**
+
+1. **Il criterio passa, ma il punteggio vede meno.** Con H-optimus-0 i tre centri 3DHistech si somigliano di più
+   negli embedding (è il guadagno di E17), e il punteggio di dominio ne riconosce meno: Rijnstate escluso è
+   rilevato meno di una volta su due. Utrecht (scanner diverso) resta rilevato al 100%.
+2. **Il criterio 3 passa per la media.** Il seme 2 (68 falsi positivi) ne rinvia 0,868, sotto 0,90; i semi 0 e 1
+   sono sopra. Con Phikon tutti e tre erano ≥ 0,99.
+3. **I falsi negativi della testa a Radboud e Rijnstate non vengono rinviati** (tra cui i 2 micro persi a Rijnstate
+   di E17): con Phikon il rinvio li prendeva quasi tutti, perché rinviava quasi tutto il centro.
+4. **Il motivo dell'esperimento (cambi che i metadati non vedono) si indebolisce:** CAMELYON16 di Utrecht contro
+   CAMELYON17 dello stesso centro è rilevato al 47% invece che al 90%.
+5. **Guadagni:** meno falsi rinvii sui positivi (0,036 contro 0,065) e sui micro (0,032 contro 0,108).
+
+**Cosa cambia.** Il controllo di dominio della testa H-optimus-0 resta com'è (V, soglia di `domain.json`). Il
+rinvio dei centri mai visti, con H-optimus-0, poggia di più sul controllo dei metadati (`predict.seen_only`), che
+resta necessario; il punteggio di dominio non basta a coprire un centro nuovo con uno scanner noto. Da rivedere se
+il monitoraggio dei negativi confermati (*Ingresso di un centro nuovo*, passo 6) diventa la difesa principale per i
+cambi dentro un centro.
+
 ## E16 — H-optimus-0 contro Phikon: centro e spostamento dei normali, a livello di tile
 
 Protocollo fissato il 24/10/2026, dopo l'estrazione H-optimus-0 di tutti gli 899 vetrini di sviluppo e prima
@@ -2418,3 +2463,17 @@ peggiore 0,875 (≥ 0,90, Rijnstate). Probe sul centro 0,998 (riportato), Robust
 2. Il backbone da solo non chiude il centro nuovo con scanner diverso. Le leve restano quelle di E14 (vetrini
    del centro nel training) e del rinvio (E10, E15), da rifare con H-optimus-0 come riferimento.
 3. Il test esterno (LPON, Philips) resta chiuso: il gate non è superato.
+
+*(Annotazione del 25/10/2026: prova del percorso di inferenza con la testa H-optimus-0.*
+- *`td task=predict backbone=h_optimus_0 head=ln_metastasis predict.alias=candidate` su 10 vetrini: uno negativo e
+  uno positivo per centro (8 di sviluppo, quindi non risposte indipendenti) e 2 ITC esclusi dal cohort, mai visti
+  in training (`patient_024_node_1` di CWZ, `patient_040_node_2` di Utrecht). 7 secondi; risposte in
+  `data/reports/h_optimus_0/predictions/ln_metastasis/`, log in `data/reports/experiments/e17/predict.log`.*
+- *Tutti rinviati con il solo motivo «versione non validata», com'è giusto per una versione `candidate`. Nessun
+  rinvio per centro, scanner o dominio: distanze di dominio 0,15–0,32 contro soglia 0,398.*
+- *Insiemi e probabilità coerenti con le etichette sugli 8 di sviluppo (negativi p 0,007–0,021, insieme {0};
+  positivi micro e macro p ≥ 0,999, insieme {1}).*
+- *I 2 ITC hanno p = 1,000, insieme {1}: la testa li tratta come metastasi. L'ITC non è tra le etichette della testa
+  (pN0(i+) in clinica); in esercizio un ITC riceverebbe una risposta «positivo». Da portare alla decisione con i
+  patologi su come trattare gli ITC.*
+- *Un vetrino LPON (`patient_081_node_0`) viene rifiutato prima di leggere gli embedding.)*
