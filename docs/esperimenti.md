@@ -22,6 +22,7 @@ riscrive. I risultati si aggiungono sotto il protocollo, con la versione del cod
 | E12 | Punteggio del vetrino dalle tile più sospette: logit d'istanza dell'ABMIL e classificatore di tile supervisionato, top-k | fatto: nessun candidato; anche le tile portano lo spostamento di centro, in direzioni diverse | se un segnale dalle tile trova le micrometastasi di un centro nuovo che la logit del vetrino diluisce, senza falsi positivi in più |
 | E13 | Pilota: normalizzazione del colore (Reinhard, Macenko) prima dell'embedding, su 44 vetrini, a livello di tile | protocollo fissato; in pausa, dopo E14 | se vale la pena rifare l'estrazione di tutto lo sviluppo (circa 2 TB da riscaricare) con il colore normalizzato |
 | E14 | Vetrini di un centro nuovo aggiunti al training (5, 10, 20, 40), contro centro mai visto, centro visto e offset di E9 | fatto (Phikon): costo d'ingresso 40 a Utrecht e CWZ; a Utrecht la specificità si chiude con 5, le micrometastasi solo con 40 | quanti casi di uso silente servono perché un centro nuovo entri nella pipeline; se la leva sono i dati raccolti o il segnale a monte (E13) |
+| E14b | E14 con H-optimus-0: stesse estrazioni e stesso criterio, riferimenti da E17 | protocollo fissato | il costo d'ingresso di un centro nuovo con il backbone dell'MVP, da portare ai patologi |
 | E15 | Riconoscere un dominio non visto dagli embedding: distanza a livello di vetrino e di tile, in leave-one-centre-out | concluso: adottabile V (rileva i centri mai visti e CAMELYON16 contro 17 dello stesso centro; falsi rinvii 0,053). Con H-optimus-0 ancora adottabile V, ma rileva meno (Rijnstate escluso 0,45, CAMELYON16 di Utrecht 0,47) | se `predict` rinvia anche i cambi di dominio che i metadati non vedono, e con quale punteggio |
 | E16 | H-optimus-0 contro Phikon a livello di tile: probe sul centro, spostamento dei normali sul centro escluso, vicini per la ricerca | fatto: criterio non rispettato ma misura primaria satura (specificità per tile 1,00 con entrambi); AUROC peggiore 0,979 → 0,997, precisione@10 tra centri 0,77–0,95 → 0,96–0,99 | se il nuovo backbone da solo riduce lo spostamento di centro che E6–E12 indicano come causa |
 | E16b | H-optimus-0 contro Phikon a livello di vetrino: classificatore di tile di E12, top-5 su tutte le tile, centro escluso | protocollo fissato | se il nuovo backbone riduce i falsi positivi per vetrino sul centro nuovo senza perdere micrometastasi |
@@ -2477,3 +2478,73 @@ peggiore 0,875 (≥ 0,90, Rijnstate). Probe sul centro 0,998 (riportato), Robust
   (pN0(i+) in clinica); in esercizio un ITC riceverebbe una risposta «positivo». Da portare alla decisione con i
   patologi su come trattare gli ITC.*
 - *Un vetrino LPON (`patient_081_node_0`) viene rifiutato prima di leggere gli embedding.)*
+
+## E14b — E14 con H-optimus-0: quanti vetrini di un centro nuovo servono con il backbone dell'MVP
+
+Protocollo fissato il 25/10/2026, dopo E17 e la ripetizione di E15 su H-optimus-0, prima di ogni addestramento di
+questo esperimento. Riferimenti: E14 (stesso disegno su Phikon), E17 (la testa H-optimus-0, vuota), E9 (offset).
+
+**Domanda.** E14 su Phikon dà un costo d'ingresso di 40 vetrini con diagnosi a Utrecht e a CWZ. E17 mostra che con
+H-optimus-0 il centro mai visto parte molto più in alto (specificità peggiore 0,430 → 0,681), ma Utrecht resta
+spostato e instabile tra semi (0,305–0,933). **Con H-optimus-0, quanti vetrini di un centro nuovo, aggiunti al
+training dell'ABMIL, servono perché quel centro si comporti come un centro visto?** Ed è un costo più basso di
+quello di Phikon?
+
+**Che cosa decide e che cosa no.** Dà il costo d'ingresso da portare alla decisione con i patologi sul percorso
+*Ingresso di un centro nuovo* ([training-multicentro.md](training-multicentro.md)), con il backbone che l'MVP
+userà. Non decide il passaggio della pipeline a H-optimus-0 (variabile `backbone` di DVC), già motivato da E17. Non
+rivede la decisione "solo calibrazione globale".
+
+**Uguale a E14** (tutto ciò che non è elencato sotto *Diverso*):
+
+- cohort `ln_metastasis` v1, 771 vetrini di sviluppo, **LPON non letto**, sole etichette del vetrino;
+- **estrazioni identiche**: stesso generatore (seme 0), stesse permutazioni dei pazienti, stessi vetrini aggiunti
+  per n ∈ {5, 10, 20, 40} e stessi vetrini di valutazione. Le estrazioni dipendono solo dal cohort: lo script
+  verifica che `draws.csv` coincida con quello di E14, così il confronto con Phikon è appaiato vetrino per vetrino;
+- modello: ABMIL con `mil` di `conf/config.yaml`, ricetta vuota, `pos_weight` globale, un thread, semi {0, 1, 2},
+  nessun peso per il centro nuovo; 4 centri × 4 n × 3 estrazioni × 3 semi = **144 modelli**;
+- esiti primari e secondari, soglia 0,5 sulla logit;
+- **criterio** (condizioni 1–4: specificità e sensibilità entro 0,05 dal centro visto, micrometastasi entro 0,10,
+  nessuno dei 9 modelli sotto 0,80 di specificità), definizione del costo d'ingresso, regola «riaddestrare rende più
+  dell'offset» (micro +0,05 se passano entrambi).
+
+**Diverso:**
+
+- embedding H-optimus-0 `b145cc1e6c6b` (1536 dimensioni) invece di Phikon;
+- **riferimenti da E17** invece che da E6 (`data/reports/h_optimus_0/heads/ln_metastasis/predictions.csv`, stesso
+  formato della riesecuzione di E10):
+  - n = 0: logit LOCO della testa H-optimus-0;
+  - centro visto: logit fuori fold della CV di E17;
+  - offset: E9 `solo in discesa` con i negativi tra gli n vetrini aggiunti, sulle logit LOCO di E17, con la mediana
+    di riferimento dalle logit `loco-calibration` di E17;
+  - temperatura per l'ECE: quella della rotazione di E17.
+- **Controllo del codice:** con il seme 0, Utrecht escluso senza vetrini aggiunti deve ridare le logit LOCO di E17
+  (differenza massima 0, come il controllo di E14 contro E6). Se non le ridà, l'esperimento si ferma prima
+  dell'analisi.
+- Report in `data/reports/experiments/e14/h_optimus_0/`.
+
+**Secondario in più (senza soglia):** confronto appaiato con E14 su Phikon, per centro e n: differenza di
+specificità, sensibilità, micro e specificità minima, sugli stessi vetrini di valutazione e con le stesse estrazioni.
+
+**Lettura** (fissata ora).
+
+- Costo d'ingresso ≤ 20 a Utrecht e CWZ: con H-optimus-0 l'ingresso di un centro con l'uso silente è praticabile;
+  il percorso si porta ai patologi con questi numeri, e la normalizzazione del colore (E13) non è una precondizione.
+- Costo d'ingresso 40 (come Phikon): il backbone migliora il punto di partenza ma non il costo; E13, se ripreso, va
+  rifatto su H-optimus-0 (il pilota è fissato su Phikon).
+- Oltre 40: come in E14, serve un protocollo con il peso del centro nuovo come variabile.
+- Costo 0 per un centro (il centro mai visto è già sufficiente) si riporta come tale, ma con la variabilità tra semi
+  di E17 su Utrecht la condizione 4 lo rende improbabile proprio lì.
+- In E14 a Utrecht il limite erano le micrometastasi (0,87–0,88 fino a 20 vetrini, contro 0,980 del centro visto),
+  non la specificità: si guarda se H-optimus-0 sposta quel limite. Un passaggio a n = 40 con margini di pochi
+  millesimi, come in E14, si riporta come fragile.
+
+**Limiti.** Come E14. In più: gli embedding di sviluppo (circa 21 GB) non stanno nella RAM del Mac, letture
+memory-mapped come in E17; il centro visto di E17 ha a sua volta una sola corsa per seme.
+
+**Costo.** E17 (22 modelli per seme, tre semi in parallelo) ha richiesto 11 ore, circa 30 minuti per modello per
+processo. E14b ha 48 modelli per seme (più il controllo con il seme 0): circa **24 ore** sul Mac con tre processi.
+Lo script riprende dai modelli già scritti (un file di logit per modello).
+
+**Codice.** `experiments/e14_new_centre.py` con il backbone come argomento (come `e15_domain.py`: senza argomento
+resta Phikon e ridà il report di E14), e `experiments/e14_run.sh`; committato prima dell'esecuzione.
